@@ -33,17 +33,17 @@ final class StatusItemController: NSObject {
             return
         }
 
-        statusItem.length = 58
+        statusItem.length = 64
         button.image = NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
         button.image?.isTemplate = true
         button.imagePosition = .imageLeading
-        button.title = "      "
+        button.title = "       "
         button.target = self
         button.action = #selector(togglePopover(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
-        indicatorView.frame = NSRect(x: 22, y: 3, width: 34, height: 16)
+        indicatorView.frame = NSRect(x: 28, y: 3, width: 34, height: 16)
         indicatorView.autoresizingMask = [.minYMargin, .maxYMargin]
         button.addSubview(indicatorView)
     }
