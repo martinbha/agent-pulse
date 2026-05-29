@@ -1,5 +1,8 @@
 import SwiftUI
 
+private let workingPulseDuration: TimeInterval = 1.8
+private let innerDotScale: CGFloat = 0.55
+
 struct StatusDot: View {
     var state: AgentState
     var size: CGFloat
@@ -18,7 +21,7 @@ struct StatusDot: View {
             if let innerColor {
                 Circle()
                     .fill(innerColor)
-                    .frame(width: size * 0.42, height: size * 0.42)
+                    .frame(width: size * innerDotScale, height: size * innerDotScale)
                     .overlay {
                         Circle()
                             .stroke(.primary.opacity(0.18), lineWidth: 0.5)
@@ -52,7 +55,7 @@ struct StatusDot: View {
     private func updatePulse() {
         if state == .working {
             workingPulse = false
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: workingPulseDuration).repeatForever(autoreverses: true)) {
                 workingPulse = true
             }
         } else {

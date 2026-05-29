@@ -3,6 +3,8 @@ import Carbon
 import Combine
 import SwiftUI
 
+private let menuBarWorkingPulseDuration: TimeInterval = 1.8
+
 @MainActor
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
@@ -288,7 +290,7 @@ final class MenuBarDotsView: NSView {
 
     private func drawDot(_ status: Status, atX x: CGFloat) {
         let outerRect = NSRect(x: x + 1, y: 1, width: 14, height: 14)
-        let innerRect = NSRect(x: x + 5, y: 5, width: 6, height: 6)
+        let innerRect = NSRect(x: x + 4, y: 4, width: 8, height: 8)
 
         statusColor(for: status.state)
             .withAlphaComponent(outerOpacity(for: status.state))
@@ -315,7 +317,7 @@ final class MenuBarDotsView: NSView {
         }
 
         let elapsed = Date().timeIntervalSince(pulseStartDate)
-        let phase = (sin((elapsed / 0.9) * 2 * .pi - .pi / 2) + 1) / 2
+        let phase = (sin((elapsed / menuBarWorkingPulseDuration) * 2 * .pi - .pi / 2) + 1) / 2
         return CGFloat(phase)
     }
 
@@ -324,7 +326,7 @@ final class MenuBarDotsView: NSView {
         case .idle:
             return .secondaryLabelColor
         case .working:
-            return .systemBlue
+            return AgentPulseColors.workingStatusNS
         case .waiting:
             return .systemYellow
         case .done:
@@ -332,7 +334,7 @@ final class MenuBarDotsView: NSView {
         case .failed:
             return .systemRed
         case .stale:
-            return .systemOrange
+            return AgentPulseColors.staleStatusNS
         case .unknown:
             return .tertiaryLabelColor
         }
