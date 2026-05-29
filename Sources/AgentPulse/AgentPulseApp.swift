@@ -2,15 +2,20 @@ import SwiftUI
 
 @main
 struct AgentPulseApp: App {
+    @StateObject private var runtime = AgentPulseRuntime()
+
     var body: some Scene {
         MenuBarExtra("Agent Pulse", systemImage: "waveform.path.ecg") {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Agent Pulse")
                     .font(.headline)
-                Text("Status plumbing is coming online.")
+                Text(runtime.serverStatus)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Divider()
+                Button("Clear Completed") {
+                    runtime.clearCompleted()
+                }
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
@@ -22,4 +27,3 @@ struct AgentPulseApp: App {
         .menuBarExtraStyle(.window)
     }
 }
-

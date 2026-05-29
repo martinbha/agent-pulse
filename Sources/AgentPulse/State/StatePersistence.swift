@@ -2,20 +2,8 @@ import Foundation
 
 struct StatePersistence: Sendable {
     private let fileURL: URL
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
 
     init(fileURL: URL? = nil) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
-        self.encoder = encoder
-        self.decoder = decoder
-
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -33,7 +21,7 @@ struct StatePersistence: Sendable {
         }
 
         let data = try Data(contentsOf: fileURL)
-        let stored = try decoder.decode([String: AgentStatusSnapshot].self, from: data)
+        let stored = try AgentPulseJSON.decoder.decode([String: AgentStatusSnapshot].self, from: data)
         return Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
             guard let agent = AgentKind(rawValue: key) else {
                 return nil
@@ -50,8 +38,7 @@ struct StatePersistence: Sendable {
             (agent.rawValue, snapshot)
         })
 
-        let data = try encoder.encode(stored)
+        let data = try AgentPulseJSON.encoder.encode(stored)
         try data.write(to: fileURL, options: .atomic)
     }
 }
-
