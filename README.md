@@ -18,6 +18,13 @@ Run the app:
 swift run agent-pulse
 ```
 
+Build a launchable menu bar app bundle:
+
+```bash
+scripts/build-app-bundle
+open "dist/Agent Pulse.app"
+```
+
 Set up Claude Code and Codex hooks with the bridge script:
 
 ```bash
