@@ -8,7 +8,8 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let panel: AgentPulsePanel
-    private let panelSize = NSSize(width: 360, height: 360)
+    private let panelSize = NSSize(width: 360, height: 260)
+    private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
 
@@ -43,7 +44,13 @@ final class StatusItemController: NSObject {
     private func configurePanel() {
         panel.setContentSize(panelSize)
         panel.contentViewController = NSHostingController(
-            rootView: AgentStatusPanel(runtime: runtime, store: runtime.store)
+            rootView: AgentStatusPanel(
+                runtime: runtime,
+                store: runtime.store,
+                openConfig: { [weak self] in
+                    self?.showConfigWindow()
+                }
+            )
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         )
@@ -154,6 +161,31 @@ final class StatusItemController: NSObject {
 
     private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
         Swift.min(Swift.max(value, minimum), maximum)
+    }
+
+    private func showConfigWindow() {
+        if let window = configWindowController?.window {
+            window.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hostingController = NSHostingController(rootView: AgentPulseConfigView(runtime: runtime))
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.title = "Agent Pulse Config"
+
+        let controller = NSWindowController(window: window)
+        configWindowController = controller
+        controller.showWindow(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     private func nsColor(for state: AgentState) -> NSColor {

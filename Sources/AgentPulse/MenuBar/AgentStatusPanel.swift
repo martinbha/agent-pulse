@@ -3,10 +3,13 @@ import SwiftUI
 struct AgentStatusPanel: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var store: AgentStatusStore
+    var openConfig: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+
+            Divider()
 
             VStack(spacing: 10) {
                 ForEach(store.orderedSnapshots) { snapshot in
@@ -20,37 +23,11 @@ struct AgentStatusPanel: View {
 
             Divider()
 
-            SettingsSummary(runtime: runtime)
-
-            Divider()
-
-            HStack(spacing: 8) {
-                Button {
-                    runtime.sendTestEvent(agent: .claude)
-                } label: {
-                    Label("Claude", systemImage: "paperplane")
-                }
-
-                Button {
-                    runtime.sendTestEvent(agent: .codex)
-                } label: {
-                    Label("Codex", systemImage: "paperplane")
-                }
-
-                Spacer()
-
-                Button {
-                    runtime.clearCompleted()
-                } label: {
-                    Label("Clear", systemImage: "checkmark.circle")
-                }
-            }
-
             HStack {
                 Button {
-                    runtime.copyStateJSON()
+                    openConfig()
                 } label: {
-                    Label("Copy State", systemImage: "doc.on.doc")
+                    Label("Config", systemImage: "gearshape")
                 }
 
                 Spacer()
@@ -64,7 +41,7 @@ struct AgentStatusPanel: View {
             }
         }
         .padding(16)
-        .frame(width: 360)
+        .frame(width: 360, height: 260)
     }
 
     private var header: some View {
@@ -86,4 +63,3 @@ struct AgentStatusPanel: View {
         }
     }
 }
-
