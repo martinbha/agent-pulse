@@ -7,11 +7,10 @@ struct MenuBarIndicatorView: View {
         HStack(spacing: 4) {
             ForEach(store.orderedSnapshots) { snapshot in
                 let state = store.effectiveState(for: snapshot)
-                StatusDot(state: state, size: 8)
+                StatusDot(state: state, size: 14, innerColor: snapshot.agent.brandAccent)
                     .help("\(snapshot.agent.displayName): \(state.displayName)")
             }
         }
         .padding(.horizontal, 2)
     }
 }
-

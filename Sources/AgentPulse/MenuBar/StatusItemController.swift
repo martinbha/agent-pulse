@@ -91,15 +91,7 @@ final class StatusItemController: NSObject {
         let title = NSMutableAttributedString()
         for snapshot in runtime.store.orderedSnapshots {
             let state = runtime.store.effectiveState(for: snapshot)
-            title.append(
-                NSAttributedString(
-                    string: "●",
-                    attributes: [
-                        .foregroundColor: nsColor(for: state),
-                        .font: NSFont.systemFont(ofSize: 12, weight: .semibold)
-                    ]
-                )
-            )
+            title.append(dotAttachment(outerColor: nsColor(for: state), innerColor: snapshot.agent.brandAccentNSColor))
             title.append(NSAttributedString(string: " "))
         }
 
@@ -161,6 +153,41 @@ final class StatusItemController: NSObject {
 
     private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
         Swift.min(Swift.max(value, minimum), maximum)
+    }
+
+    private func dotAttachment(outerColor: NSColor, innerColor: NSColor) -> NSAttributedString {
+        let attachment = NSTextAttachment()
+        attachment.image = dotImage(outerColor: outerColor, innerColor: innerColor)
+        attachment.bounds = NSRect(x: 0, y: -3, width: 16, height: 16)
+        return NSAttributedString(attachment: attachment)
+    }
+
+    private func dotImage(outerColor: NSColor, innerColor: NSColor) -> NSImage {
+        let size = NSSize(width: 16, height: 16)
+        let image = NSImage(size: size)
+        image.lockFocus()
+
+        let outerRect = NSRect(x: 1, y: 1, width: 14, height: 14)
+        outerColor.setFill()
+        NSBezierPath(ovalIn: outerRect).fill()
+
+        NSColor.black.withAlphaComponent(0.12).setStroke()
+        let outerStroke = NSBezierPath(ovalIn: outerRect.insetBy(dx: 0.25, dy: 0.25))
+        outerStroke.lineWidth = 0.5
+        outerStroke.stroke()
+
+        let innerRect = NSRect(x: 5, y: 5, width: 6, height: 6)
+        innerColor.setFill()
+        NSBezierPath(ovalIn: innerRect).fill()
+
+        NSColor.black.withAlphaComponent(0.18).setStroke()
+        let innerStroke = NSBezierPath(ovalIn: innerRect.insetBy(dx: 0.25, dy: 0.25))
+        innerStroke.lineWidth = 0.5
+        innerStroke.stroke()
+
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
     }
 
     private func showConfigWindow() {

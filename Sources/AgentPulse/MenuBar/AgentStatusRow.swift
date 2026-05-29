@@ -7,8 +7,8 @@ struct AgentStatusRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            StatusDot(state: effectiveState, size: 12)
-                .padding(.top, 4)
+            StatusDot(state: effectiveState, size: 16, innerColor: snapshot.agent.brandAccent)
+                .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
@@ -51,4 +51,3 @@ struct AgentStatusRow: View {
         return RelativeTimeFormatter.shared.localizedString(for: snapshot.updatedAt, relativeTo: now)
     }
 }
-
