@@ -8,6 +8,7 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let panel: AgentPulsePanel
+    private let iconView = MenuBarIconView()
     private let indicatorView = MenuBarDotsView()
     private let panelSize = NSSize(width: 360, height: 260)
     private var configWindowController: NSWindowController?
@@ -34,18 +35,50 @@ final class StatusItemController: NSObject {
         }
 
         statusItem.length = 64
-        button.image = NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
-        button.image?.isTemplate = true
-        button.imagePosition = .imageLeading
-        button.title = "       "
+        button.image = nil
+        button.title = ""
         button.target = self
         button.action = #selector(togglePopover(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
+        iconView.image = menuBarIcon()
+        iconView.image?.isTemplate = true
+        iconView.imageScaling = .scaleProportionallyDown
+        iconView.frame = NSRect(x: 1, y: 3, width: 24, height: 16)
+        iconView.autoresizingMask = [.minYMargin, .maxYMargin]
+        button.addSubview(iconView)
+
         indicatorView.frame = NSRect(x: 28, y: 3, width: 34, height: 16)
         indicatorView.autoresizingMask = [.minYMargin, .maxYMargin]
         button.addSubview(indicatorView)
+    }
+
+    private func menuBarIcon() -> NSImage? {
+        let urls = [
+            Bundle.main.url(forResource: "agent-pulse-menubar", withExtension: "svg"),
+            sourceResourceURL(named: "agent-pulse-menubar", extension: "svg")
+        ].compactMap { $0 }
+
+        for url in urls {
+            guard let image = NSImage(contentsOf: url) else {
+                continue
+            }
+
+            image.size = NSSize(width: 22, height: 12)
+            image.accessibilityDescription = "Agent Pulse"
+            return image
+        }
+
+        return NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
+    }
+
+    private func sourceResourceURL(named name: String, extension fileExtension: String) -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources", isDirectory: true)
+            .appendingPathComponent("\(name).\(fileExtension)")
     }
 
     private func configurePanel() {
@@ -228,6 +261,12 @@ final class AgentPulsePanel: NSPanel {
     override func orderOut(_ sender: Any?) {
         super.orderOut(sender)
         didOrderOut?()
+    }
+}
+
+final class MenuBarIconView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
     }
 }
 

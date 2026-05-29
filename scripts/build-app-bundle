@@ -9,6 +9,9 @@ APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+APP_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulse/Resources/agent-pulse-icon.svg"
+MENU_BAR_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulse/Resources/agent-pulse-menubar.svg"
+APP_ICON_NAME="AgentPulse"
 
 cd "$ROOT_DIR"
 swift build -c release
@@ -19,6 +22,36 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$APP_NAME"
 cp "$ROOT_DIR/Sources/AgentPulse/Resources/working-verbs.txt" "$RESOURCES_DIR/working-verbs.txt"
+cp "$APP_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-icon.svg"
+cp "$MENU_BAR_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-menubar.svg"
+
+ICONSET_PARENT="$(mktemp -d)"
+ICONSET_DIR="$ICONSET_PARENT/$APP_ICON_NAME.iconset"
+mkdir -p "$ICONSET_DIR"
+trap 'rm -rf "$ICONSET_PARENT"' EXIT
+
+make_icon() {
+  local points="$1"
+  local scale="$2"
+  local filename="$3"
+  local pixels=$((points * scale))
+
+  sips -s format png -z "$pixels" "$pixels" "$APP_ICON_SOURCE" \
+    --out "$ICONSET_DIR/$filename" >/dev/null
+}
+
+make_icon 16 1 icon_16x16.png
+make_icon 16 2 icon_16x16@2x.png
+make_icon 32 1 icon_32x32.png
+make_icon 32 2 icon_32x32@2x.png
+make_icon 128 1 icon_128x128.png
+make_icon 128 2 icon_128x128@2x.png
+make_icon 256 1 icon_256x256.png
+make_icon 256 2 icon_256x256@2x.png
+make_icon 512 1 icon_512x512.png
+make_icon 512 2 icon_512x512@2x.png
+
+iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/$APP_ICON_NAME.icns"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,6 +62,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
+  <key>CFBundleIconFile</key>
+  <string>$APP_ICON_NAME</string>
   <key>CFBundleName</key>
   <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
