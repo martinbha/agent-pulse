@@ -290,7 +290,7 @@ final class MenuBarDotsView: NSView {
         case .waiting:
             return .systemYellow
         case .done:
-            return .systemGreen
+            return AgentPulseColors.doneStatusNS
         case .failed:
             return .systemRed
         case .stale:

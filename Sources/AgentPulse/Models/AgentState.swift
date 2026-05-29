@@ -37,7 +37,7 @@ enum AgentState: String, CaseIterable, Codable, Sendable {
         case .waiting:
             return .yellow
         case .done:
-            return .green
+            return AgentPulseColors.doneStatus
         case .failed:
             return .red
         case .stale:
