@@ -3,8 +3,6 @@ import Carbon
 import Combine
 import SwiftUI
 
-private let menuBarWorkingPulseDuration: TimeInterval = 1.8
-
 @MainActor
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
@@ -14,8 +12,6 @@ final class StatusItemController: NSObject {
     private let panelSize = NSSize(width: 360, height: 260)
     private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
-    private var pulseTimer: Timer?
-    private var pulseStartDate = Date()
     private var cancellables: Set<AnyCancellable> = []
 
     init(runtime: AgentPulseRuntime) {
@@ -119,8 +115,6 @@ final class StatusItemController: NSObject {
                 return "\(snapshot.agent.displayName): \(state.displayName)"
             }
             .joined(separator: "\n")
-
-        updatePulseTimer()
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -173,27 +167,6 @@ final class StatusItemController: NSObject {
 
     private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
         Swift.min(Swift.max(value, minimum), maximum)
-    }
-
-    private func updatePulseTimer() {
-        let shouldPulse = runtime.store.orderedSnapshots.contains { snapshot in
-            runtime.store.effectiveState(for: snapshot) == .working
-        }
-
-        if shouldPulse, pulseTimer == nil {
-            pulseStartDate = Date()
-            indicatorView.pulseStartDate = pulseStartDate
-            let timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.indicatorView.needsDisplay = true
-                }
-            }
-            timer.tolerance = 0.05
-            pulseTimer = timer
-        } else if !shouldPulse {
-            pulseTimer?.invalidate()
-            pulseTimer = nil
-        }
     }
 
     private func showConfigWindow() {
@@ -270,8 +243,6 @@ final class MenuBarDotsView: NSView {
         }
     }
 
-    var pulseStartDate = Date()
-
     override var isFlipped: Bool {
         true
     }
@@ -290,10 +261,9 @@ final class MenuBarDotsView: NSView {
 
     private func drawDot(_ status: Status, atX x: CGFloat) {
         let outerRect = NSRect(x: x + 1, y: 1, width: 14, height: 14)
-        let innerRect = NSRect(x: x + 4, y: 4, width: 8, height: 8)
+        let innerRect = NSRect(x: x + 4.92, y: 4.92, width: 6.16, height: 6.16)
 
         statusColor(for: status.state)
-            .withAlphaComponent(outerOpacity(for: status.state))
             .setFill()
         NSBezierPath(ovalIn: outerRect).fill()
 
@@ -309,16 +279,6 @@ final class MenuBarDotsView: NSView {
         let innerStroke = NSBezierPath(ovalIn: innerRect.insetBy(dx: 0.25, dy: 0.25))
         innerStroke.lineWidth = 0.5
         innerStroke.stroke()
-    }
-
-    private func outerOpacity(for state: AgentState) -> CGFloat {
-        guard state == .working else {
-            return 1
-        }
-
-        let elapsed = Date().timeIntervalSince(pulseStartDate)
-        let phase = (sin((elapsed / menuBarWorkingPulseDuration) * 2 * .pi - .pi / 2) + 1) / 2
-        return CGFloat(phase)
     }
 
     private func statusColor(for state: AgentState) -> NSColor {

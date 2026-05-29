@@ -1,19 +1,16 @@
 import SwiftUI
 
-private let workingPulseDuration: TimeInterval = 1.8
-private let innerDotScale: CGFloat = 0.55
+private let innerDotScale: CGFloat = 0.44
 
 struct StatusDot: View {
     var state: AgentState
     var size: CGFloat
     var innerColor: Color?
 
-    @State private var workingPulse = false
-
     var body: some View {
         ZStack {
             Circle()
-                .fill(outerColor)
+                .fill(state.color)
 
             Circle()
                 .stroke(.primary.opacity(0.14), lineWidth: 0.5)
@@ -30,18 +27,6 @@ struct StatusDot: View {
         }
         .frame(width: size, height: size)
         .shadow(color: shadowColor, radius: 2, y: 1)
-        .onAppear(perform: updatePulse)
-        .onChange(of: state) {
-            updatePulse()
-        }
-    }
-
-    private var outerColor: Color {
-        guard state == .working else {
-            return state.color
-        }
-
-        return state.color.opacity(workingPulse ? 1 : 0)
     }
 
     private var shadowColor: Color {
@@ -49,17 +34,6 @@ struct StatusDot: View {
             return state.color.opacity(0)
         }
 
-        return state.color.opacity(state == .working ? (workingPulse ? 0.45 : 0) : 0.45)
-    }
-
-    private func updatePulse() {
-        if state == .working {
-            workingPulse = false
-            withAnimation(.easeInOut(duration: workingPulseDuration).repeatForever(autoreverses: true)) {
-                workingPulse = true
-            }
-        } else {
-            workingPulse = false
-        }
+        return state.color.opacity(0.45)
     }
 }
