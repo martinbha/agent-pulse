@@ -13,8 +13,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AgentPulse",
-            path: "Sources/AgentPulse"
+            path: "Sources/AgentPulse",
+            exclude: ["Resources"]
         )
     ]
 )
-

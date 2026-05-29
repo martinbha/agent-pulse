@@ -7,6 +7,7 @@ final class AgentPulseRuntime: ObservableObject {
 
     @Published private(set) var serverStatus = "Starting local server..."
 
+    private let notificationService: AgentNotificationService
     private var server: LocalEventServer?
     private var timer: Timer?
 
@@ -25,6 +26,7 @@ final class AgentPulseRuntime: ObservableObject {
     init() {
         self.store = AgentStatusStore()
         self.settings = AgentPulseSettings()
+        self.notificationService = AgentNotificationService()
 
         startServer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
@@ -37,6 +39,7 @@ final class AgentPulseRuntime: ObservableObject {
     init(store: AgentStatusStore, settings: AgentPulseSettings) {
         self.store = store
         self.settings = settings
+        self.notificationService = AgentNotificationService()
 
         startServer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
@@ -64,7 +67,7 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     private func sendTestEvent(agent: AgentKind, state: AgentState, event: String) {
-        store.ingest(
+        ingest(
             AgentEvent(
                 agent: agent,
                 state: state,
@@ -112,9 +115,9 @@ final class AgentPulseRuntime: ObservableObject {
         let server = LocalEventServer(
             port: settings.port,
             token: settings.token,
-            eventHandler: { [weak store] event in
+            eventHandler: { [weak self] event in
                 await MainActor.run {
-                    store?.ingest(event)
+                    self?.ingest(event)
                 }
             },
             stateProvider: { [weak store] in
@@ -136,5 +139,23 @@ final class AgentPulseRuntime: ObservableObject {
         } catch {
             serverStatus = "Server failed: \(error.localizedDescription)"
         }
+    }
+
+    private func ingest(_ event: AgentEvent) {
+        let previousSnapshot = store.snapshots[event.agent] ?? .idle(agent: event.agent)
+        let previousState = store.effectiveState(for: previousSnapshot)
+
+        store.ingest(event)
+
+        guard let newSnapshot = store.snapshots[event.agent] else {
+            return
+        }
+
+        notificationService.handleTransition(
+            agent: event.agent,
+            previousState: previousState,
+            newSnapshot: newSnapshot,
+            newState: store.effectiveState(for: newSnapshot)
+        )
     }
 }
