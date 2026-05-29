@@ -10,6 +10,18 @@ final class AgentPulseRuntime: ObservableObject {
     private var server: LocalEventServer?
     private var timer: Timer?
 
+    var endpoint: String {
+        "http://127.0.0.1:\(settings.port)"
+    }
+
+    var maskedToken: String {
+        guard settings.token.count > 12 else {
+            return settings.token
+        }
+
+        return "\(settings.token.prefix(6))...\(settings.token.suffix(6))"
+    }
+
     init() {
         self.store = AgentStatusStore()
         self.settings = AgentPulseSettings()
@@ -41,6 +53,45 @@ final class AgentPulseRuntime: ObservableObject {
 
     func clearCompleted() {
         store.clearCompleted()
+    }
+
+    func sendTestEvent(agent: AgentKind) {
+        store.ingest(
+            AgentEvent(
+                agent: agent,
+                state: .working,
+                event: "ManualTest",
+                sessionID: nil,
+                cwd: FileManager.default.currentDirectoryPath,
+                project: "agent-pulse",
+                timestamp: Date(),
+                source: "manual-test"
+            )
+        )
+    }
+
+    func copyEndpoint() {
+        Pasteboard.copy(endpoint)
+    }
+
+    func copyToken() {
+        Pasteboard.copy(settings.token)
+    }
+
+    func copyStateJSON() {
+        let response = ServerStateResponse(store: store)
+        if let data = try? AgentPulseJSON.encoder.encode(response),
+           let value = String(data: data, encoding: .utf8) {
+            Pasteboard.copy(value)
+        }
+    }
+
+    func regenerateToken() {
+        server?.stop()
+        server = nil
+        settings.regenerateToken()
+        serverStatus = "Restarting local server..."
+        startServer()
     }
 
     private func startServer() {
