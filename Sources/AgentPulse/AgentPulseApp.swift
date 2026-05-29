@@ -23,6 +23,10 @@ final class AgentPulseAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let appIcon = AgentPulseImages.appIcon() {
+            NSApplication.shared.applicationIconImage = appIcon
+        }
+
         let runtime = AgentPulseRuntime()
         self.runtime = runtime
         self.statusItemController = StatusItemController(runtime: runtime)

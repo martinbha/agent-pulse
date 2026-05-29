@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct AgentStatusPanel: View {
@@ -46,9 +47,7 @@ struct AgentStatusPanel: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "waveform.path.ecg")
-                .font(.title2)
-                .symbolRenderingMode(.hierarchical)
+            AgentPulseHeaderLogo()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Agent Pulse")
@@ -60,6 +59,22 @@ struct AgentStatusPanel: View {
             }
 
             Spacer()
+        }
+    }
+}
+
+private struct AgentPulseHeaderLogo: View {
+    var body: some View {
+        if let image = AgentPulseImages.appIcon(size: NSSize(width: 32, height: 32)) {
+            Image(nsImage: image)
+                .resizable()
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        } else {
+            Image(systemName: "waveform.path.ecg")
+                .font(.title2)
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: 32, height: 32)
         }
     }
 }

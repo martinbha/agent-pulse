@@ -42,8 +42,7 @@ final class StatusItemController: NSObject {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
-        iconView.image = menuBarIcon()
-        iconView.image?.isTemplate = true
+        iconView.image = AgentPulseImages.menuBarIcon()
         iconView.imageScaling = .scaleProportionallyDown
         iconView.frame = NSRect(x: 1, y: 3, width: 24, height: 16)
         iconView.autoresizingMask = [.minYMargin, .maxYMargin]
@@ -52,33 +51,6 @@ final class StatusItemController: NSObject {
         indicatorView.frame = NSRect(x: 28, y: 3, width: 34, height: 16)
         indicatorView.autoresizingMask = [.minYMargin, .maxYMargin]
         button.addSubview(indicatorView)
-    }
-
-    private func menuBarIcon() -> NSImage? {
-        let urls = [
-            Bundle.main.url(forResource: "agent-pulse-menubar", withExtension: "svg"),
-            sourceResourceURL(named: "agent-pulse-menubar", extension: "svg")
-        ].compactMap { $0 }
-
-        for url in urls {
-            guard let image = NSImage(contentsOf: url) else {
-                continue
-            }
-
-            image.size = NSSize(width: 22, height: 12)
-            image.accessibilityDescription = "Agent Pulse"
-            return image
-        }
-
-        return NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
-    }
-
-    private func sourceResourceURL(named name: String, extension fileExtension: String) -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Resources", isDirectory: true)
-            .appendingPathComponent("\(name).\(fileExtension)")
     }
 
     private func configurePanel() {
