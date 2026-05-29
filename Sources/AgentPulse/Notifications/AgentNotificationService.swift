@@ -40,10 +40,12 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
 
     private func requestAuthorization() {
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error {
-                NSLog("Agent Pulse notification authorization failed: \(error.localizedDescription)")
-            } else if !granted {
-                NSLog("Agent Pulse notifications were not granted")
+            Task { @MainActor in
+                if let error {
+                    NSLog("Agent Pulse notification authorization failed: %{public}@", error.localizedDescription)
+                } else if !granted {
+                    NSLog("Agent Pulse notifications were not granted")
+                }
             }
         }
     }
@@ -66,7 +68,9 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
 
         center.add(request) { error in
             if let error {
-                NSLog("Agent Pulse notification failed: \(error.localizedDescription)")
+                Task { @MainActor in
+                    NSLog("Agent Pulse notification failed: %{public}@", error.localizedDescription)
+                }
             }
         }
     }
