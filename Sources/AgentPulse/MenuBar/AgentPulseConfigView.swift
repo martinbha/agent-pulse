@@ -17,25 +17,43 @@ struct AgentPulseConfigView: View {
                 Text("Test Events")
                     .font(.headline)
 
-                HStack(spacing: 8) {
-                    Button {
-                        runtime.sendTestEvent(agent: .claude)
-                    } label: {
-                        Label("Claude", systemImage: "paperplane")
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button {
+                            runtime.sendTestEvent(agent: .claude)
+                        } label: {
+                            Label("Start Claude", systemImage: "play.circle")
+                        }
+
+                        Button {
+                            runtime.sendTestEvent(agent: .codex)
+                        } label: {
+                            Label("Start Codex", systemImage: "play.circle")
+                        }
+
+                        Spacer()
                     }
 
-                    Button {
-                        runtime.sendTestEvent(agent: .codex)
-                    } label: {
-                        Label("Codex", systemImage: "paperplane")
-                    }
+                    HStack(spacing: 8) {
+                        Button {
+                            runtime.stopTestEvent(agent: .claude)
+                        } label: {
+                            Label("Stop Claude", systemImage: "stop.circle")
+                        }
 
-                    Spacer()
+                        Button {
+                            runtime.stopTestEvent(agent: .codex)
+                        } label: {
+                            Label("Stop Codex", systemImage: "stop.circle")
+                        }
 
-                    Button {
-                        runtime.clearCompleted()
-                    } label: {
-                        Label("Clear", systemImage: "checkmark.circle")
+                        Spacer()
+
+                        Button {
+                            runtime.clearCompleted()
+                        } label: {
+                            Label("Clear", systemImage: "checkmark.circle")
+                        }
                     }
                 }
             }

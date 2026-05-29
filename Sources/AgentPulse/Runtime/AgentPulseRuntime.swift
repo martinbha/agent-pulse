@@ -56,11 +56,19 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     func sendTestEvent(agent: AgentKind) {
+        sendTestEvent(agent: agent, state: .working, event: "ManualStart")
+    }
+
+    func stopTestEvent(agent: AgentKind) {
+        sendTestEvent(agent: agent, state: .done, event: "ManualStop")
+    }
+
+    private func sendTestEvent(agent: AgentKind, state: AgentState, event: String) {
         store.ingest(
             AgentEvent(
                 agent: agent,
-                state: .working,
-                event: "ManualTest",
+                state: state,
+                event: event,
                 sessionID: nil,
                 cwd: FileManager.default.currentDirectoryPath,
                 project: "agent-pulse",
