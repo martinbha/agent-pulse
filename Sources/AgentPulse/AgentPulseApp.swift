@@ -1,15 +1,35 @@
-import SwiftUI
+import AppKit
 
 @main
-struct AgentPulseApp: App {
-    @StateObject private var runtime = AgentPulseRuntime()
+enum AgentPulseApp {
+    @MainActor private static var appDelegate: AgentPulseAppDelegate?
 
-    var body: some Scene {
-        MenuBarExtra {
-            AgentStatusPanel(runtime: runtime, store: runtime.store)
-        } label: {
-            MenuBarIndicatorView(store: runtime.store)
-        }
-        .menuBarExtraStyle(.window)
+    @MainActor
+    static func main() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+
+        let delegate = AgentPulseAppDelegate()
+        appDelegate = delegate
+        app.delegate = delegate
+
+        app.run()
+    }
+}
+
+@MainActor
+final class AgentPulseAppDelegate: NSObject, NSApplicationDelegate {
+    private var runtime: AgentPulseRuntime?
+    private var statusItemController: StatusItemController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let runtime = AgentPulseRuntime()
+        self.runtime = runtime
+        self.statusItemController = StatusItemController(runtime: runtime)
+        NSLog("Agent Pulse started with endpoint \(runtime.endpoint)")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        NSLog("Agent Pulse stopped")
     }
 }
