@@ -5,10 +5,12 @@ struct StatusDot: View {
     var size: CGFloat
     var innerColor: Color?
 
+    @State private var workingPulse = false
+
     var body: some View {
         ZStack {
             Circle()
-                .fill(state.color)
+                .fill(outerColor)
 
             Circle()
                 .stroke(.primary.opacity(0.14), lineWidth: 0.5)
@@ -24,6 +26,37 @@ struct StatusDot: View {
             }
         }
         .frame(width: size, height: size)
-        .shadow(color: state.color.opacity(state == .idle ? 0 : 0.45), radius: 2, y: 1)
+        .shadow(color: shadowColor, radius: 2, y: 1)
+        .onAppear(perform: updatePulse)
+        .onChange(of: state) {
+            updatePulse()
+        }
+    }
+
+    private var outerColor: Color {
+        guard state == .working else {
+            return state.color
+        }
+
+        return state.color.opacity(workingPulse ? 1 : 0)
+    }
+
+    private var shadowColor: Color {
+        guard state != .idle else {
+            return state.color.opacity(0)
+        }
+
+        return state.color.opacity(state == .working ? (workingPulse ? 0.45 : 0) : 0.45)
+    }
+
+    private func updatePulse() {
+        if state == .working {
+            workingPulse = false
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                workingPulse = true
+            }
+        } else {
+            workingPulse = false
+        }
     }
 }

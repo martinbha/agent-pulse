@@ -8,9 +8,12 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let panel: AgentPulsePanel
+    private let indicatorView = MenuBarDotsView()
     private let panelSize = NSSize(width: 360, height: 260)
     private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
+    private var pulseTimer: Timer?
+    private var pulseStartDate = Date()
     private var cancellables: Set<AnyCancellable> = []
 
     init(runtime: AgentPulseRuntime) {
@@ -32,17 +35,29 @@ final class StatusItemController: NSObject {
             return
         }
 
+        statusItem.length = 58
         button.image = NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
         button.image?.isTemplate = true
         button.imagePosition = .imageLeading
+        button.title = "      "
         button.target = self
         button.action = #selector(togglePopover(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
+
+        indicatorView.frame = NSRect(x: 22, y: 3, width: 34, height: 16)
+        indicatorView.autoresizingMask = [.minYMargin, .maxYMargin]
+        button.addSubview(indicatorView)
     }
 
     private func configurePanel() {
         panel.setContentSize(panelSize)
+        panel.didOrderOut = { [weak panel] in
+            panel?.contentViewController = nil
+        }
+    }
+
+    private func installPanelContent() {
         panel.contentViewController = NSHostingController(
             rootView: AgentStatusPanel(
                 runtime: runtime,
@@ -88,20 +103,22 @@ final class StatusItemController: NSObject {
             return
         }
 
-        let title = NSMutableAttributedString()
-        for snapshot in runtime.store.orderedSnapshots {
-            let state = runtime.store.effectiveState(for: snapshot)
-            title.append(dotAttachment(outerColor: nsColor(for: state), innerColor: snapshot.agent.brandAccentNSColor))
-            title.append(NSAttributedString(string: " "))
+        indicatorView.statuses = runtime.store.orderedSnapshots.map { snapshot in
+            MenuBarDotsView.Status(
+                agent: snapshot.agent,
+                state: runtime.store.effectiveState(for: snapshot)
+            )
         }
+        indicatorView.needsDisplay = true
 
-        button.attributedTitle = title
         button.toolTip = runtime.store.orderedSnapshots
             .map { snapshot in
                 let state = runtime.store.effectiveState(for: snapshot)
                 return "\(snapshot.agent.displayName): \(state.displayName)"
             }
             .joined(separator: "\n")
+
+        updatePulseTimer()
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -120,6 +137,7 @@ final class StatusItemController: NSObject {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
+            installPanelContent()
             panel.setFrame(panelFrame(below: button), display: true)
             panel.orderFrontRegardless()
             NSApplication.shared.activate(ignoringOtherApps: true)
@@ -155,39 +173,25 @@ final class StatusItemController: NSObject {
         Swift.min(Swift.max(value, minimum), maximum)
     }
 
-    private func dotAttachment(outerColor: NSColor, innerColor: NSColor) -> NSAttributedString {
-        let attachment = NSTextAttachment()
-        attachment.image = dotImage(outerColor: outerColor, innerColor: innerColor)
-        attachment.bounds = NSRect(x: 0, y: -3, width: 16, height: 16)
-        return NSAttributedString(attachment: attachment)
-    }
+    private func updatePulseTimer() {
+        let shouldPulse = runtime.store.orderedSnapshots.contains { snapshot in
+            runtime.store.effectiveState(for: snapshot) == .working
+        }
 
-    private func dotImage(outerColor: NSColor, innerColor: NSColor) -> NSImage {
-        let size = NSSize(width: 16, height: 16)
-        let image = NSImage(size: size)
-        image.lockFocus()
-
-        let outerRect = NSRect(x: 1, y: 1, width: 14, height: 14)
-        outerColor.setFill()
-        NSBezierPath(ovalIn: outerRect).fill()
-
-        NSColor.black.withAlphaComponent(0.12).setStroke()
-        let outerStroke = NSBezierPath(ovalIn: outerRect.insetBy(dx: 0.25, dy: 0.25))
-        outerStroke.lineWidth = 0.5
-        outerStroke.stroke()
-
-        let innerRect = NSRect(x: 5, y: 5, width: 6, height: 6)
-        innerColor.setFill()
-        NSBezierPath(ovalIn: innerRect).fill()
-
-        NSColor.black.withAlphaComponent(0.18).setStroke()
-        let innerStroke = NSBezierPath(ovalIn: innerRect.insetBy(dx: 0.25, dy: 0.25))
-        innerStroke.lineWidth = 0.5
-        innerStroke.stroke()
-
-        image.unlockFocus()
-        image.isTemplate = false
-        return image
+        if shouldPulse, pulseTimer == nil {
+            pulseStartDate = Date()
+            indicatorView.pulseStartDate = pulseStartDate
+            let timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.indicatorView.needsDisplay = true
+                }
+            }
+            timer.tolerance = 0.05
+            pulseTimer = timer
+        } else if !shouldPulse {
+            pulseTimer?.invalidate()
+            pulseTimer = nil
+        }
     }
 
     private func showConfigWindow() {
@@ -215,27 +219,11 @@ final class StatusItemController: NSObject {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
-    private func nsColor(for state: AgentState) -> NSColor {
-        switch state {
-        case .idle:
-            return .secondaryLabelColor
-        case .working:
-            return .systemBlue
-        case .waiting:
-            return .systemYellow
-        case .done:
-            return .systemGreen
-        case .failed:
-            return .systemRed
-        case .stale:
-            return .systemOrange
-        case .unknown:
-            return .tertiaryLabelColor
-        }
-    }
 }
 
 final class AgentPulsePanel: NSPanel {
+    var didOrderOut: (() -> Void)?
+
     init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 360),
@@ -260,5 +248,93 @@ final class AgentPulsePanel: NSPanel {
 
     override var canBecomeMain: Bool {
         true
+    }
+
+    override func orderOut(_ sender: Any?) {
+        super.orderOut(sender)
+        didOrderOut?()
+    }
+}
+
+final class MenuBarDotsView: NSView {
+    struct Status {
+        var agent: AgentKind
+        var state: AgentState
+    }
+
+    var statuses: [Status] = [] {
+        didSet {
+            needsDisplay = true
+        }
+    }
+
+    var pulseStartDate = Date()
+
+    override var isFlipped: Bool {
+        true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        for (index, status) in statuses.enumerated() {
+            drawDot(status, atX: CGFloat(index) * 18)
+        }
+    }
+
+    private func drawDot(_ status: Status, atX x: CGFloat) {
+        let outerRect = NSRect(x: x + 1, y: 1, width: 14, height: 14)
+        let innerRect = NSRect(x: x + 5, y: 5, width: 6, height: 6)
+
+        statusColor(for: status.state)
+            .withAlphaComponent(outerOpacity(for: status.state))
+            .setFill()
+        NSBezierPath(ovalIn: outerRect).fill()
+
+        NSColor.black.withAlphaComponent(0.12).setStroke()
+        let outerStroke = NSBezierPath(ovalIn: outerRect.insetBy(dx: 0.25, dy: 0.25))
+        outerStroke.lineWidth = 0.5
+        outerStroke.stroke()
+
+        status.agent.brandAccentNSColor.setFill()
+        NSBezierPath(ovalIn: innerRect).fill()
+
+        NSColor.black.withAlphaComponent(0.18).setStroke()
+        let innerStroke = NSBezierPath(ovalIn: innerRect.insetBy(dx: 0.25, dy: 0.25))
+        innerStroke.lineWidth = 0.5
+        innerStroke.stroke()
+    }
+
+    private func outerOpacity(for state: AgentState) -> CGFloat {
+        guard state == .working else {
+            return 1
+        }
+
+        let elapsed = Date().timeIntervalSince(pulseStartDate)
+        let phase = (sin((elapsed / 0.9) * 2 * .pi - .pi / 2) + 1) / 2
+        return CGFloat(phase)
+    }
+
+    private func statusColor(for state: AgentState) -> NSColor {
+        switch state {
+        case .idle:
+            return .secondaryLabelColor
+        case .working:
+            return .systemBlue
+        case .waiting:
+            return .systemYellow
+        case .done:
+            return .systemGreen
+        case .failed:
+            return .systemRed
+        case .stale:
+            return .systemOrange
+        case .unknown:
+            return .tertiaryLabelColor
+        }
     }
 }
