@@ -24,6 +24,16 @@ struct SettingsSummary: View {
                     .textSelection(.enabled)
             }
 
+            HStack {
+                Label("Config", systemImage: "gearshape")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(runtime.settings.bridgeConfigPath)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+
             HStack(spacing: 8) {
                 Button {
                     runtime.copyEndpoint()
@@ -49,4 +59,3 @@ struct SettingsSummary: View {
         .font(.caption)
     }
 }
-

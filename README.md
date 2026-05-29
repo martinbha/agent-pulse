@@ -18,5 +18,10 @@ Run the app:
 swift run agent-pulse
 ```
 
-The first implementation targets a Swift Package executable so the core app can be built with Command Line Tools. A full `.app` bundle and WidgetKit extension can be added after the core event loop is stable.
+Set up Claude Code and Codex hooks with the bridge script:
 
+```bash
+open docs/hook-setup.md
+```
+
+The first implementation targets a Swift Package executable so the core app can be built with Command Line Tools. A full `.app` bundle and WidgetKit extension can be added after the core event loop is stable.
