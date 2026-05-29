@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Combine
 import SwiftUI
 
@@ -7,6 +8,7 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let popover: NSPopover
+    private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
 
     init(runtime: AgentPulseRuntime) {
@@ -18,6 +20,7 @@ final class StatusItemController: NSObject {
 
         configureStatusItem()
         configurePopover()
+        configureHotKey()
         bindUpdates()
         updateStatusItem()
     }
@@ -42,6 +45,15 @@ final class StatusItemController: NSObject {
         popover.contentViewController = NSHostingController(
             rootView: AgentStatusPanel(runtime: runtime, store: runtime.store)
         )
+    }
+
+    private func configureHotKey() {
+        hotKey = GlobalHotKey(
+            keyCode: UInt32(kVK_ANSI_1),
+            modifiers: UInt32(cmdKey | shiftKey)
+        ) { [weak self] in
+            self?.togglePopover()
+        }
     }
 
     private func bindUpdates() {
@@ -82,16 +94,6 @@ final class StatusItemController: NSObject {
             title.append(NSAttributedString(string: " "))
         }
 
-        title.append(
-            NSAttributedString(
-                string: "Pulse",
-                attributes: [
-                    .foregroundColor: NSColor.labelColor,
-                    .font: NSFont.systemFont(ofSize: 12, weight: .medium)
-                ]
-            )
-        )
-
         button.attributedTitle = title
         button.toolTip = runtime.store.orderedSnapshots
             .map { snapshot in
@@ -102,14 +104,18 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func togglePopover(_ sender: Any?) {
+        togglePopover()
+    }
+
+    private func togglePopover() {
         guard let button = statusItem.button else {
             return
         }
 
         if popover.isShown {
-            popover.performClose(sender)
+            popover.performClose(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
     }
