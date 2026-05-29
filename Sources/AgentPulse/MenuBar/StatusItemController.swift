@@ -7,19 +7,20 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
-    private let popover: NSPopover
+    private let panel: AgentPulsePanel
+    private let panelSize = NSSize(width: 360, height: 360)
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
 
     init(runtime: AgentPulseRuntime) {
         self.runtime = runtime
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        self.popover = NSPopover()
+        self.panel = AgentPulsePanel()
 
         super.init()
 
         configureStatusItem()
-        configurePopover()
+        configurePanel()
         configureHotKey()
         bindUpdates()
         updateStatusItem()
@@ -39,11 +40,12 @@ final class StatusItemController: NSObject {
         button.toolTip = "Agent Pulse"
     }
 
-    private func configurePopover() {
-        popover.behavior = .transient
-        popover.contentSize = NSSize(width: 360, height: 360)
-        popover.contentViewController = NSHostingController(
+    private func configurePanel() {
+        panel.setContentSize(panelSize)
+        panel.contentViewController = NSHostingController(
             rootView: AgentStatusPanel(runtime: runtime, store: runtime.store)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         )
     }
 
@@ -104,20 +106,54 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func togglePopover(_ sender: Any?) {
-        togglePopover()
+        togglePanel()
     }
 
     private func togglePopover() {
+        togglePanel()
+    }
+
+    private func togglePanel() {
         guard let button = statusItem.button else {
             return
         }
 
-        if popover.isShown {
-            popover.performClose(nil)
+        if panel.isVisible {
+            panel.orderOut(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            panel.setFrame(panelFrame(below: button), display: true)
+            panel.orderFrontRegardless()
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
+    }
+
+    private func panelFrame(below button: NSStatusBarButton) -> NSRect {
+        let screen = button.window?.screen ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
+        let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
+        let margin: CGFloat = 8
+
+        let x = clamp(
+            buttonFrame.midX - panelSize.width / 2,
+            min: visibleFrame.minX + margin,
+            max: visibleFrame.maxX - panelSize.width - margin
+        )
+
+        let y = min(
+            buttonFrame.minY - panelSize.height - margin,
+            visibleFrame.maxY - panelSize.height - margin
+        )
+
+        return NSRect(
+            x: x,
+            y: max(y, visibleFrame.minY + margin),
+            width: panelSize.width,
+            height: panelSize.height
+        )
+    }
+
+    private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(value, minimum), maximum)
     }
 
     private func nsColor(for state: AgentState) -> NSColor {
@@ -137,5 +173,33 @@ final class StatusItemController: NSObject {
         case .unknown:
             return .tertiaryLabelColor
         }
+    }
+}
+
+final class AgentPulsePanel: NSPanel {
+    init() {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 360),
+            styleMask: [.borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+
+        backgroundColor = .clear
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        hasShadow = true
+        hidesOnDeactivate = true
+        isMovableByWindowBackground = false
+        isOpaque = false
+        isReleasedWhenClosed = false
+        level = .floating
+    }
+
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        true
     }
 }
