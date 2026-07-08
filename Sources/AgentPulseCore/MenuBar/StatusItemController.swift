@@ -8,8 +8,7 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let panel: AgentPulsePanel
-    private let iconView = MenuBarIconView()
-    private let indicatorView = MenuBarDotsView()
+    private let pillsView = MenuBarPillsView()
     private let panelSize = NSSize(width: 360, height: 260)
     private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
@@ -34,7 +33,6 @@ final class StatusItemController: NSObject {
             return
         }
 
-        statusItem.length = 64
         button.image = nil
         button.title = ""
         button.target = self
@@ -42,15 +40,9 @@ final class StatusItemController: NSObject {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
-        iconView.image = AgentPulseImages.menuBarIcon()
-        iconView.imageScaling = .scaleProportionallyDown
-        iconView.frame = NSRect(x: 1, y: 3, width: 24, height: 16)
-        iconView.autoresizingMask = [.minYMargin, .maxYMargin]
-        button.addSubview(iconView)
-
-        indicatorView.frame = NSRect(x: 28, y: 3, width: 34, height: 16)
-        indicatorView.autoresizingMask = [.minYMargin, .maxYMargin]
-        button.addSubview(indicatorView)
+        pillsView.frame = button.bounds
+        pillsView.autoresizingMask = [.width, .height]
+        button.addSubview(pillsView)
     }
 
     private func configurePanel() {
@@ -84,21 +76,19 @@ final class StatusItemController: NSObject {
     }
 
     private func bindUpdates() {
-        runtime.objectWillChange
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateStatusItem()
+        for publisher in [
+            runtime.objectWillChange,
+            runtime.store.objectWillChange,
+            runtime.usageStore.objectWillChange,
+        ] {
+            publisher
+                .sink { [weak self] _ in
+                    DispatchQueue.main.async {
+                        self?.updateStatusItem()
+                    }
                 }
-            }
-            .store(in: &cancellables)
-
-        runtime.store.objectWillChange
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateStatusItem()
-                }
-            }
-            .store(in: &cancellables)
+                .store(in: &cancellables)
+        }
     }
 
     private func updateStatusItem() {
@@ -106,18 +96,23 @@ final class StatusItemController: NSObject {
             return
         }
 
-        indicatorView.statuses = runtime.store.orderedSnapshots.map { snapshot in
-            MenuBarDotsView.Status(
+        let snapshots = runtime.store.orderedSnapshots
+        pillsView.pills = snapshots.map { snapshot in
+            MenuBarPillBuilder.pill(
                 agent: snapshot.agent,
-                state: runtime.store.effectiveState(for: snapshot)
+                effectiveState: runtime.store.effectiveState(for: snapshot),
+                usedPercentage: runtime.usageStore.snapshot(for: snapshot.agent).fiveHour.usedPercentage
             )
         }
-        indicatorView.needsDisplay = true
+        statusItem.length = pillsView.fittingWidth()
 
-        button.toolTip = runtime.store.orderedSnapshots
+        button.toolTip = snapshots
             .map { snapshot in
                 let state = runtime.store.effectiveState(for: snapshot)
-                return "\(snapshot.agent.displayName): \(state.displayName)"
+                let usage = runtime.usageStore.snapshot(for: snapshot.agent)
+                let fiveHour = MenuBarPillBuilder.usageText(for: usage.fiveHour.usedPercentage)
+                let weekly = MenuBarPillBuilder.usageText(for: usage.weekly.usedPercentage)
+                return "\(snapshot.agent.displayName): \(state.displayName) · 5h \(fiveHour)% · week \(weekly)%"
             }
             .joined(separator: "\n")
     }
@@ -233,81 +228,5 @@ final class AgentPulsePanel: NSPanel {
     override func orderOut(_ sender: Any?) {
         super.orderOut(sender)
         didOrderOut?()
-    }
-}
-
-final class MenuBarIconView: NSImageView {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-}
-
-final class MenuBarDotsView: NSView {
-    struct Status {
-        var agent: AgentKind
-        var state: AgentState
-    }
-
-    var statuses: [Status] = [] {
-        didSet {
-            needsDisplay = true
-        }
-    }
-
-    override var isFlipped: Bool {
-        true
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        for (index, status) in statuses.enumerated() {
-            drawDot(status, atX: CGFloat(index) * 18)
-        }
-    }
-
-    private func drawDot(_ status: Status, atX x: CGFloat) {
-        let outerRect = NSRect(x: x + 1, y: 1, width: 14, height: 14)
-        let innerRect = NSRect(x: x + 4.92, y: 4.92, width: 6.16, height: 6.16)
-
-        statusColor(for: status.state)
-            .setFill()
-        NSBezierPath(ovalIn: outerRect).fill()
-
-        NSColor.black.withAlphaComponent(0.12).setStroke()
-        let outerStroke = NSBezierPath(ovalIn: outerRect.insetBy(dx: 0.25, dy: 0.25))
-        outerStroke.lineWidth = 0.5
-        outerStroke.stroke()
-
-        status.agent.brandAccentNSColor.setFill()
-        NSBezierPath(ovalIn: innerRect).fill()
-
-        NSColor.black.withAlphaComponent(0.18).setStroke()
-        let innerStroke = NSBezierPath(ovalIn: innerRect.insetBy(dx: 0.25, dy: 0.25))
-        innerStroke.lineWidth = 0.5
-        innerStroke.stroke()
-    }
-
-    private func statusColor(for state: AgentState) -> NSColor {
-        switch state {
-        case .idle:
-            return .secondaryLabelColor
-        case .working:
-            return AgentPulseColors.workingStatusNS
-        case .waiting:
-            return .systemYellow
-        case .done:
-            return AgentPulseColors.doneStatusNS
-        case .failed:
-            return .systemRed
-        case .stale:
-            return AgentPulseColors.staleStatusNS
-        case .unknown:
-            return .tertiaryLabelColor
-        }
     }
 }
