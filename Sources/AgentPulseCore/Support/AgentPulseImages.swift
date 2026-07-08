@@ -1,22 +1,6 @@
 import AppKit
 
 enum AgentPulseImages {
-    static func menuBarIcon() -> NSImage? {
-        guard let image = resourceImage(
-            named: "agent-pulse-menubar",
-            extension: "svg",
-            size: NSSize(width: 22, height: 12)
-        ) else {
-            let fallback = NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "Agent Pulse")
-            fallback?.isTemplate = true
-            return fallback
-        }
-
-        image.isTemplate = true
-        image.accessibilityDescription = "Agent Pulse"
-        return image
-    }
-
     static func appIcon(size: NSSize? = nil) -> NSImage? {
         resourceImage(
             named: "agent-pulse-icon",

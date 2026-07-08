@@ -23,5 +23,15 @@ enum AgentKind: String, CaseIterable, Codable, Identifiable, Sendable {
             return "X"
         }
     }
+
+    /// Two-letter label shown in the menu bar pill.
+    var pillLabel: String {
+        switch self {
+        case .claude:
+            return "Cl"
+        case .codex:
+            return "Cx"
+        }
+    }
 }
 
