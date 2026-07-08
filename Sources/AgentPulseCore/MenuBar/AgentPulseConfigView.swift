@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AgentPulseConfigView: View {
     @ObservedObject var runtime: AgentPulseRuntime
+    @ObservedObject var appearance: AppearanceSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -10,6 +11,10 @@ struct AgentPulseConfigView: View {
             Divider()
 
             SettingsSummary(runtime: runtime)
+
+            Divider()
+
+            BrandColorSettings(appearance: appearance)
 
             Divider()
 

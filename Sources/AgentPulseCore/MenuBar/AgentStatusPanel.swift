@@ -5,6 +5,7 @@ struct AgentStatusPanel: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var store: AgentStatusStore
     @ObservedObject var usageStore: UsageStore
+    @ObservedObject var appearance: AppearanceSettings
     var openConfig: () -> Void
 
     var body: some View {
@@ -20,6 +21,7 @@ struct AgentStatusPanel: View {
                         effectiveState: store.effectiveState(for: snapshot),
                         usage: usageStore.snapshot(for: snapshot.agent),
                         availability: usageStore.status(for: snapshot.agent).availability,
+                        accent: appearance.color(for: snapshot.agent),
                         now: store.now
                     )
                 }
