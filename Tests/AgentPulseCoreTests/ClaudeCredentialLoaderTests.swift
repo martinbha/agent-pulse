@@ -137,4 +137,8 @@ import Testing
     @Test func fileSourcePersistsRotatedToken() {
         #expect(ClaudeCredentialFixtures.fileSaveRoundTrip() == "rotated-token")
     }
+
+    @Test func fileSaveKeepsOwnerOnlyPermissions() {
+        #expect(ClaudeCredentialFixtures.fileSavePermissions() == 0o600)
+    }
 }

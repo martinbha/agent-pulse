@@ -372,6 +372,9 @@ struct ClaudeCredentialLoader {
             return
         }
         try? data.write(to: url, options: .atomic)
+        // The atomic replace creates the file with default permissions; keep
+        // the credential file owner-only like the CLI does.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     private func saveToKeychain(_ result: ClaudeCredentialResult) {

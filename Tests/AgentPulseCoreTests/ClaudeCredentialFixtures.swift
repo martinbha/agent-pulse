@@ -141,6 +141,29 @@ enum ClaudeCredentialFixtures {
         return loader.resolveCredentials().credentials?.oauth.accessToken
     }
 
+    /// Rotates a file-sourced token and returns the credential file's POSIX
+    /// permissions after the save.
+    static func fileSavePermissions() -> Int? {
+        let home = makeTempHome()
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: home,
+            environment: [:],
+            keychainLoadOverride: .success(nil),
+            desktopSafeStoragePasswordOverride: .success(nil)
+        )
+        writeCredentialsFile(home: home, json: sampleFileJSON)
+
+        guard var credentials = loader.resolveCredentials().credentials else {
+            return nil
+        }
+        credentials.oauth.accessToken = "rotated-token"
+        loader.saveCredentials(credentials)
+
+        let path = home.appendingPathComponent(".claude/.credentials.json").path
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        return (attributes?[.posixPermissions] as? NSNumber)?.intValue
+    }
+
     // MARK: - Private helpers
 
     private static func makeLoader(
