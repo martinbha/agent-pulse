@@ -1,6 +1,8 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 
 import PackageDescription
+
+let swift5Mode: [SwiftSetting] = [.swiftLanguageMode(.v5)]
 
 let package = Package(
     name: "agent-pulse",
@@ -11,10 +13,23 @@ let package = Package(
         .executable(name: "agent-pulse", targets: ["AgentPulse"])
     ],
     targets: [
+        .target(
+            name: "AgentPulseCore",
+            path: "Sources/AgentPulseCore",
+            exclude: ["Resources"],
+            swiftSettings: swift5Mode
+        ),
         .executableTarget(
             name: "AgentPulse",
+            dependencies: ["AgentPulseCore"],
             path: "Sources/AgentPulse",
-            exclude: ["Resources"]
+            swiftSettings: swift5Mode
+        ),
+        .testTarget(
+            name: "AgentPulseCoreTests",
+            dependencies: ["AgentPulseCore"],
+            path: "Tests/AgentPulseCoreTests",
+            swiftSettings: swift5Mode
         )
     ]
 )
