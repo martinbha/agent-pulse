@@ -42,6 +42,9 @@ final class StatusItemController: NSObject {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
+        pillsView.brandColor = { [weak runtime] agent in
+            runtime?.appearance.nsColor(for: agent) ?? agent.brandAccentNSColor
+        }
         pillsView.frame = button.bounds
         pillsView.autoresizingMask = [.width, .height]
         button.addSubview(pillsView)
@@ -61,6 +64,7 @@ final class StatusItemController: NSObject {
                 runtime: runtime,
                 store: runtime.store,
                 usageStore: runtime.usageStore,
+                appearance: runtime.appearance,
                 openConfig: { [weak self] in
                     self?.showConfigWindow()
                 }
@@ -95,6 +99,7 @@ final class StatusItemController: NSObject {
             runtime.objectWillChange,
             runtime.store.objectWillChange,
             runtime.usageStore.objectWillChange,
+            runtime.appearance.objectWillChange,
         ] {
             publisher
                 .sink { [weak self] _ in
@@ -120,6 +125,9 @@ final class StatusItemController: NSObject {
             )
         }
         statusItem.length = pillsView.fittingWidth()
+        // The pill model is unchanged when only a brand color changes, so force
+        // a repaint to pick up a new custom color.
+        pillsView.needsDisplay = true
 
         button.toolTip = snapshots
             .map { snapshot in
@@ -193,7 +201,9 @@ final class StatusItemController: NSObject {
             return
         }
 
-        let hostingController = NSHostingController(rootView: AgentPulseConfigView(runtime: runtime))
+        let hostingController = NSHostingController(
+            rootView: AgentPulseConfigView(runtime: runtime, appearance: runtime.appearance)
+        )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
             styleMask: [.titled, .closable, .miniaturizable],

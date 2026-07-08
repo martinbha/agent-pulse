@@ -5,11 +5,12 @@ struct AgentStatusRow: View {
     var effectiveState: AgentState
     var usage: AgentUsageSnapshot
     var availability: UsageAvailability
+    var accent: Color
     var now: Date
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            StatusDot(state: effectiveState, size: 16, innerColor: snapshot.agent.brandAccent)
+            StatusDot(state: effectiveState, size: 16, innerColor: accent)
                 .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 5) {
@@ -52,8 +53,8 @@ struct AgentStatusRow: View {
     private var usageSection: some View {
         if hasUsageData {
             VStack(alignment: .leading, spacing: 4) {
-                UsageBar(label: "5h", window: usage.fiveHour, accent: snapshot.agent.brandAccent)
-                UsageBar(label: "Week", window: usage.weekly, accent: snapshot.agent.brandAccent)
+                UsageBar(label: "5h", window: usage.fiveHour, accent: accent)
+                UsageBar(label: "Week", window: usage.weekly, accent: accent)
             }
         } else if let message = availabilityText {
             HStack(spacing: 6) {
