@@ -3,6 +3,8 @@ import SwiftUI
 struct AgentStatusRow: View {
     var snapshot: AgentStatusSnapshot
     var effectiveState: AgentState
+    var usage: AgentUsageSnapshot
+    var availability: UsageAvailability
     var now: Date
 
     var body: some View {
@@ -39,7 +41,56 @@ struct AgentStatusRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                usageSection
+                    .padding(.top, 2)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var usageSection: some View {
+        if hasUsageData {
+            VStack(alignment: .leading, spacing: 4) {
+                UsageBar(label: "5h", window: usage.fiveHour, accent: snapshot.agent.brandAccent)
+                UsageBar(label: "Week", window: usage.weekly, accent: snapshot.agent.brandAccent)
+            }
+        } else if let message = availabilityText {
+            HStack(spacing: 6) {
+                Image(systemName: unavailableIcon)
+                Text(message)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading usage…")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var hasUsageData: Bool {
+        usage.fiveHour.usedPercentage != nil || usage.weekly.usedPercentage != nil
+    }
+
+    private var availabilityText: String? {
+        UsageWindowFormatter.availabilityMessage(availability)
+    }
+
+    private var unavailableIcon: String {
+        switch availability {
+        case .accessDenied:
+            return "lock.fill"
+        case .notInstalled:
+            return "questionmark.app"
+        default:
+            return "exclamationmark.triangle"
         }
     }
 
