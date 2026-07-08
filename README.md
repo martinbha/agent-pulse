@@ -18,6 +18,14 @@ Run the app:
 swift run agent-pulse
 ```
 
+Run the tests (use the wrapper — it adds the framework search paths that
+Command Line Tools-only installs need; with full Xcode, plain `swift test`
+also works):
+
+```bash
+scripts/test
+```
+
 Build a launchable menu bar app bundle:
 
 ```bash
