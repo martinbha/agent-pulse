@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class AgentPulseRuntime: ObservableObject {
     let store: AgentStatusStore
+    let usageStore: UsageStore
     let settings: AgentPulseSettings
 
     @Published private(set) var serverStatus = "Starting local server..."
@@ -23,9 +24,22 @@ final class AgentPulseRuntime: ObservableObject {
         return "\(settings.token.prefix(6))...\(settings.token.suffix(6))"
     }
 
-    init() {
-        self.store = AgentStatusStore()
-        self.settings = AgentPulseSettings()
+    convenience init() {
+        self.init(
+            store: AgentStatusStore(),
+            usageStore: UsageStore(),
+            settings: AgentPulseSettings()
+        )
+    }
+
+    init(
+        store: AgentStatusStore,
+        usageStore: UsageStore,
+        settings: AgentPulseSettings
+    ) {
+        self.store = store
+        self.usageStore = usageStore
+        self.settings = settings
         self.notificationService = AgentNotificationService()
 
         startServer()
@@ -36,17 +50,8 @@ final class AgentPulseRuntime: ObservableObject {
         }
     }
 
-    init(store: AgentStatusStore, settings: AgentPulseSettings) {
-        self.store = store
-        self.settings = settings
-        self.notificationService = AgentNotificationService()
-
-        startServer()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
-            Task { @MainActor in
-                store?.tick()
-            }
-        }
+    func refreshUsage() {
+        Task { await usageStore.refresh(trigger: .manual) }
     }
 
     deinit {
