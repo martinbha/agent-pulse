@@ -164,9 +164,9 @@ enum ClaudeCredentialFixtures {
         return (attributes?[.posixPermissions] as? NSNumber)?.intValue
     }
 
-    // MARK: - Private helpers
+    // MARK: - Loader construction (shared with usage probe fixtures)
 
-    private static func makeLoader(
+    static func makeLoader(
         fileJSON: String? = nil,
         environmentToken: String? = nil,
         keychain: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> = .success(nil),
