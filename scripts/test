@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Command Line Tools-only installs ship Testing.framework outside the default
+# search paths, and the flags must apply globally so SwiftPM's synthesized test
+# runner can import Testing (otherwise it compiles as an empty stub and reports
+# success without running anything). Full Xcode installs need no extra flags.
+ARGS=()
+FRAMEWORKS=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
+if [[ "$(xcode-select -p)" == "/Library/Developer/CommandLineTools" && -d "$FRAMEWORKS" ]]; then
+  ARGS+=(
+    -Xswiftc -F"$FRAMEWORKS"
+    -Xlinker -F"$FRAMEWORKS"
+    -Xlinker -rpath -Xlinker "$FRAMEWORKS"
+  )
+fi
+
+exec swift test "${ARGS[@]+"${ARGS[@]}"}" "$@"
