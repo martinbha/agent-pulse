@@ -4,6 +4,7 @@ import SwiftUI
 struct AgentStatusPanel: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var store: AgentStatusStore
+    @ObservedObject var usageStore: UsageStore
     var openConfig: () -> Void
 
     var body: some View {
@@ -12,11 +13,13 @@ struct AgentStatusPanel: View {
 
             Divider()
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 ForEach(store.orderedSnapshots) { snapshot in
                     AgentStatusRow(
                         snapshot: snapshot,
                         effectiveState: store.effectiveState(for: snapshot),
+                        usage: usageStore.snapshot(for: snapshot.agent),
+                        availability: usageStore.status(for: snapshot.agent).availability,
                         now: store.now
                     )
                 }
@@ -42,7 +45,7 @@ struct AgentStatusPanel: View {
             }
         }
         .padding(16)
-        .frame(width: 360, height: 260)
+        .frame(width: 360)
     }
 
     private var header: some View {
@@ -52,13 +55,27 @@ struct AgentStatusPanel: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Agent Pulse")
                     .font(.headline)
-                Text(runtime.serverStatus)
+                Text(UsageWindowFormatter.lastUpdatedText(usageStore.lastUpdated, now: store.now))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             Spacer()
+
+            Button {
+                Task { await usageStore.refresh(trigger: .manual) }
+            } label: {
+                if usageStore.isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+            .buttonStyle(.borderless)
+            .disabled(usageStore.isRefreshing)
+            .help("Refresh usage")
         }
     }
 }

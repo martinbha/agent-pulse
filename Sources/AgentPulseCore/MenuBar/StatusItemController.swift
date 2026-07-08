@@ -9,7 +9,9 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let panel: AgentPulsePanel
     private let pillsView = MenuBarPillsView()
-    private let panelSize = NSSize(width: 360, height: 260)
+    private let panelWidth: CGFloat = 360
+    private var panelContentSize = NSSize(width: 360, height: 260)
+    private var panelHostingController: NSHostingController<AnyView>?
     private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
@@ -46,23 +48,36 @@ final class StatusItemController: NSObject {
     }
 
     private func configurePanel() {
-        panel.setContentSize(panelSize)
-        panel.didOrderOut = { [weak panel] in
-            panel?.contentViewController = nil
+        panel.setContentSize(panelContentSize)
+        panel.didOrderOut = { [weak self] in
+            self?.panel.contentViewController = nil
+            self?.panelHostingController = nil
         }
     }
 
     private func installPanelContent() {
-        panel.contentViewController = NSHostingController(
-            rootView: AgentStatusPanel(
+        let rootView = AnyView(
+            AgentStatusPanel(
                 runtime: runtime,
                 store: runtime.store,
+                usageStore: runtime.usageStore,
                 openConfig: { [weak self] in
                     self?.showConfigWindow()
                 }
             )
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        )
+
+        let hostingController = NSHostingController(rootView: rootView)
+        panelHostingController = hostingController
+        panel.contentViewController = hostingController
+
+        // Size the panel to the SwiftUI content so richer rows aren't clipped.
+        let fitting = hostingController.view.fittingSize
+        panelContentSize = NSSize(
+            width: panelWidth,
+            height: max(fitting.height, 200)
         )
     }
 
@@ -134,6 +149,7 @@ final class StatusItemController: NSObject {
             panel.orderOut(nil)
         } else {
             installPanelContent()
+            panel.setContentSize(panelContentSize)
             panel.setFrame(panelFrame(below: button), display: true)
             panel.orderFrontRegardless()
             NSApplication.shared.activate(ignoringOtherApps: true)
@@ -145,23 +161,24 @@ final class StatusItemController: NSObject {
         let visibleFrame = screen?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
         let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
         let margin: CGFloat = 8
+        let size = panelContentSize
 
         let x = clamp(
-            buttonFrame.midX - panelSize.width / 2,
+            buttonFrame.midX - size.width / 2,
             min: visibleFrame.minX + margin,
-            max: visibleFrame.maxX - panelSize.width - margin
+            max: visibleFrame.maxX - size.width - margin
         )
 
         let y = min(
-            buttonFrame.minY - panelSize.height - margin,
-            visibleFrame.maxY - panelSize.height - margin
+            buttonFrame.minY - size.height - margin,
+            visibleFrame.maxY - size.height - margin
         )
 
         return NSRect(
             x: x,
             y: max(y, visibleFrame.minY + margin),
-            width: panelSize.width,
-            height: panelSize.height
+            width: size.width,
+            height: size.height
         )
     }
 
