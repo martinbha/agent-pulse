@@ -160,6 +160,7 @@ final class StatusItemController: NSObject {
             return
         }
 
+        closePinnedPanel()
         NSApplication.shared.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         startDismissMonitoring()
@@ -167,7 +168,9 @@ final class StatusItemController: NSObject {
 
     private func closePopover() {
         if popover.isShown {
-            popover.performClose(nil)
+            // close() is unconditional; performClose can be deferred while the
+            // hotkey event is being handled, leaving both dropdowns visible.
+            popover.close()
         }
         stopDismissMonitoring()
     }
@@ -224,6 +227,10 @@ final class StatusItemController: NSObject {
         positionPinnedPanel(panel)
         NSApplication.shared.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func closePinnedPanel() {
+        pinnedPanel?.orderOut(nil)
     }
 
     private func makePinnedPanel() -> PinnedOverlayPanel {
