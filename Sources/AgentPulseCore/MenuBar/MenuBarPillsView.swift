@@ -17,12 +17,12 @@ final class MenuBarPillsView: NSView {
     /// be injected later without changing the drawing code).
     var brandColor: (AgentKind) -> NSColor = { $0.brandAccentNSColor }
 
-    private let pillHeight: CGFloat = 15
-    private let horizontalPadding: CGFloat = 5.5
-    private let pillSpacing: CGFloat = 5
+    private let pillHeight: CGFloat = 19
+    private let horizontalPadding: CGFloat = 7
+    private let pillSpacing: CGFloat = 6
     private let sideMargin: CGFloat = 2
 
-    private static var font: NSFont { AgentPulseFont.nsFont(size: 11, weight: .semibold) }
+    private static var font: NSFont { AgentPulseFont.nsFont(size: 12.5, weight: .semibold) }
 
     override var isFlipped: Bool { false }
 
