@@ -52,7 +52,7 @@ struct AgentStatusRow: View {
     @ViewBuilder
     private var usageSection: some View {
         if hasUsageData {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 UsageBar(label: "5h", window: usage.fiveHour, accent: accent)
                 UsageBar(label: "Week", window: usage.weekly, accent: accent)
             }
