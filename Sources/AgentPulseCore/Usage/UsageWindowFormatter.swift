@@ -18,42 +18,35 @@ enum UsageWindowFormatter {
         return min(max(usedPercentage / 100, 0), 1)
     }
 
-    /// "resets 4:30 PM" for the 5-hour window (clock time) or "resets Tue" for
-    /// the weekly window (weekday), or nil when no reset time is known.
-    static func resetText(
-        for window: UsageWindow,
-        calendar: Calendar = .current,
-        locale: Locale = .current
-    ) -> String? {
-        guard let resetsAt = window.resetsAt else {
-            return nil
+    /// Time remaining until a window resets, e.g. "4d 5h 30m", "3h 06m", "05m",
+    /// or "<1m" when under a minute (or already reset).
+    static func resetCountdown(_ date: Date, now: Date = .now) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(now).rounded(.down)))
+        if seconds < 60 {
+            return "<1m"
         }
 
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
+        let totalMinutes = seconds / 60
+        let days = totalMinutes / 1440
+        let hours = (totalMinutes % 1440) / 60
+        let minutes = totalMinutes % 60
 
-        switch window.kind {
-        case .fiveHour:
-            formatter.dateStyle = .none
-            formatter.timeStyle = .short
-        case .weekly:
-            formatter.setLocalizedDateFormatFromTemplate("EEE")
+        var parts: [String] = []
+        if days > 0 {
+            parts.append("\(days)d")
         }
-
-        return "resets \(formatter.string(from: resetsAt))"
+        if hours > 0 || days > 0 {
+            parts.append("\(hours)h")
+        }
+        parts.append(String(format: "%02dm", minutes))
+        return parts.joined(separator: " ")
     }
 
-    /// Combined "42% · resets 4:30 PM", or whichever part is available.
-    static func detailLine(
-        for window: UsageWindow,
-        calendar: Calendar = .current,
-        locale: Locale = .current
-    ) -> String? {
+    /// Combined "42% · 3h 06m", or whichever part is available.
+    static func detailLine(for window: UsageWindow, now: Date = .now) -> String? {
         let parts = [
             percentText(window.usedPercentage),
-            resetText(for: window, calendar: calendar, locale: locale),
+            window.resetsAt.map { resetCountdown($0, now: now) },
         ].compactMap { $0 }
 
         return parts.isEmpty ? nil : parts.joined(separator: " · ")

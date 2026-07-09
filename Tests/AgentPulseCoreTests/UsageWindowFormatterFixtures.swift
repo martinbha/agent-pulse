@@ -3,65 +3,53 @@ import Foundation
 @testable import AgentPulseCore
 
 enum UsageWindowFormatterFixtures {
-    private static func utcCalendar() -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }
+    private static let now = Date(timeIntervalSince1970: 1_000_000)
 
-    private static let posix = Locale(identifier: "en_US_POSIX")
-
-    // 2026-01-07 16:30 UTC is a Wednesday.
-    private static func sampleReset() -> Date {
-        var components = DateComponents()
-        components.year = 2026
-        components.month = 1
-        components.day = 7
-        components.hour = 16
-        components.minute = 30
-        components.timeZone = TimeZone(identifier: "UTC")
-        return Calendar(identifier: .gregorian).date(from: components)!
-    }
-
-    private static func window(_ kind: UsageWindowKind, used: Double?, reset: Date?) -> UsageWindow {
-        UsageWindow(kind: kind, usedPercentage: used, resetsAt: reset)
-    }
-
-    static func fiveHourResetText() -> String? {
-        UsageWindowFormatter.resetText(
-            for: window(.fiveHour, used: 42, reset: sampleReset()),
-            calendar: utcCalendar(),
-            locale: posix
+    private static func window(_ kind: UsageWindowKind, used: Double?, resetInSeconds: Double?) -> UsageWindow {
+        UsageWindow(
+            kind: kind,
+            usedPercentage: used,
+            resetsAt: resetInSeconds.map { now.addingTimeInterval($0) }
         )
     }
 
-    static func weeklyResetText() -> String? {
-        UsageWindowFormatter.resetText(
-            for: window(.weekly, used: 67, reset: sampleReset()),
-            calendar: utcCalendar(),
-            locale: posix
-        )
+    // MARK: - Reset countdown
+
+    static func countdownDaysHoursMinutes() -> String {
+        UsageWindowFormatter.resetCountdown(now.addingTimeInterval(4 * 86_400 + 5 * 3_600 + 30 * 60), now: now)
     }
 
-    static func resetTextIsNilWithoutDate() -> Bool {
-        UsageWindowFormatter.resetText(for: window(.fiveHour, used: 42, reset: nil)) == nil
+    static func countdownHoursMinutes() -> String {
+        UsageWindowFormatter.resetCountdown(now.addingTimeInterval(3 * 3_600 + 6 * 60), now: now)
     }
+
+    static func countdownMinutesOnly() -> String {
+        UsageWindowFormatter.resetCountdown(now.addingTimeInterval(5 * 60), now: now)
+    }
+
+    static func countdownUnderAMinute() -> String {
+        UsageWindowFormatter.resetCountdown(now.addingTimeInterval(30), now: now)
+    }
+
+    static func countdownAlreadyReset() -> String {
+        UsageWindowFormatter.resetCountdown(now.addingTimeInterval(-100), now: now)
+    }
+
+    // MARK: - Detail line
 
     static func detailLineFull() -> String? {
-        UsageWindowFormatter.detailLine(
-            for: window(.fiveHour, used: 42, reset: sampleReset()),
-            calendar: utcCalendar(),
-            locale: posix
-        )
+        UsageWindowFormatter.detailLine(for: window(.weekly, used: 42, resetInSeconds: 3 * 3_600 + 6 * 60), now: now)
     }
 
     static func detailLinePercentOnly() -> String? {
-        UsageWindowFormatter.detailLine(for: window(.fiveHour, used: 42, reset: nil))
+        UsageWindowFormatter.detailLine(for: window(.fiveHour, used: 42, resetInSeconds: nil), now: now)
     }
 
     static func detailLineIsNilWhenEmpty() -> Bool {
-        UsageWindowFormatter.detailLine(for: window(.fiveHour, used: nil, reset: nil)) == nil
+        UsageWindowFormatter.detailLine(for: window(.fiveHour, used: nil, resetInSeconds: nil), now: now) == nil
     }
+
+    // MARK: - Header
 
     static func lastUpdatedRecent() -> String {
         UsageWindowFormatter.lastUpdatedText(Date(timeIntervalSinceNow: -120), now: Date())
