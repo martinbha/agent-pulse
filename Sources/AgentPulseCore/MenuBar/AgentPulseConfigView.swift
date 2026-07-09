@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentPulseConfigView: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var appearance: AppearanceSettings
+    @ObservedObject var hotkeySettings: HotkeySettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -15,6 +16,20 @@ struct AgentPulseConfigView: View {
             Divider()
 
             BrandColorSettings(appearance: appearance)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Overlay Shortcut")
+                    .font(.headline)
+                HStack {
+                    Text("Toggle pinned overlay")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    HotkeyRecorder(settings: hotkeySettings)
+                }
+                .font(.callout)
+            }
 
             Divider()
 
