@@ -7,27 +7,34 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
-    private let panel: AgentPulsePanel
+    private let popover = NSPopover()
     private let pillsView = MenuBarPillsView()
-    private let panelWidth: CGFloat = 360
-    private var panelContentSize = NSSize(width: 360, height: 260)
-    private var panelHostingController: NSHostingController<AnyView>?
     private var configWindowController: NSWindowController?
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
+    private var globalClickMonitor: Any?
+    private var appResignObserver: NSObjectProtocol?
 
     init(runtime: AgentPulseRuntime) {
         self.runtime = runtime
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        self.panel = AgentPulsePanel()
 
         super.init()
 
         configureStatusItem()
-        configurePanel()
+        configurePopover()
         configureHotKey()
         bindUpdates()
         updateStatusItem()
+    }
+
+    deinit {
+        if let globalClickMonitor {
+            NSEvent.removeMonitor(globalClickMonitor)
+        }
+        if let appResignObserver {
+            NotificationCenter.default.removeObserver(appResignObserver)
+        }
     }
 
     private func configureStatusItem() {
@@ -38,7 +45,7 @@ final class StatusItemController: NSObject {
         button.image = nil
         button.title = ""
         button.target = self
-        button.action = #selector(togglePopover(_:))
+        button.action = #selector(handleStatusItemClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
 
@@ -50,38 +57,23 @@ final class StatusItemController: NSObject {
         button.addSubview(pillsView)
     }
 
-    private func configurePanel() {
-        panel.setContentSize(panelContentSize)
-        panel.didOrderOut = { [weak self] in
-            self?.panel.contentViewController = nil
-            self?.panelHostingController = nil
-        }
+    private func configurePopover() {
+        // .semitransient dismisses on interaction with other windows but not on
+        // the status-item click itself, so the toggle below stays in control.
+        popover.behavior = .semitransient
+        popover.animates = false
+        popover.contentViewController = NSHostingController(rootView: makeDropdownView())
     }
 
-    private func installPanelContent() {
-        let rootView = AnyView(
-            AgentStatusPanel(
-                runtime: runtime,
-                store: runtime.store,
-                usageStore: runtime.usageStore,
-                appearance: runtime.appearance,
-                openConfig: { [weak self] in
-                    self?.showConfigWindow()
-                }
-            )
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        )
-
-        let hostingController = NSHostingController(rootView: rootView)
-        panelHostingController = hostingController
-        panel.contentViewController = hostingController
-
-        // Size the panel to the SwiftUI content so richer rows aren't clipped.
-        let fitting = hostingController.view.fittingSize
-        panelContentSize = NSSize(
-            width: panelWidth,
-            height: max(fitting.height, 200)
+    private func makeDropdownView() -> AgentStatusPanel {
+        AgentStatusPanel(
+            runtime: runtime,
+            store: runtime.store,
+            usageStore: runtime.usageStore,
+            appearance: runtime.appearance,
+            openConfig: { [weak self] in
+                self?.showConfigWindow()
+            }
         )
     }
 
@@ -140,61 +132,72 @@ final class StatusItemController: NSObject {
             .joined(separator: "\n")
     }
 
-    @objc private func togglePopover(_ sender: Any?) {
-        togglePanel()
+    @objc private func handleStatusItemClick(_ sender: Any?) {
+        togglePopover()
     }
 
     private func togglePopover() {
-        togglePanel()
-    }
-
-    private func togglePanel() {
         guard let button = statusItem.button else {
             return
         }
 
-        if panel.isVisible {
-            panel.orderOut(nil)
-        } else {
-            installPanelContent()
-            panel.setContentSize(panelContentSize)
-            panel.setFrame(panelFrame(below: button), display: true)
-            panel.orderFrontRegardless()
-            NSApplication.shared.activate(ignoringOtherApps: true)
+        if popover.isShown {
+            closePopover()
+            return
+        }
+
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        startDismissMonitoring()
+    }
+
+    private func closePopover() {
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        stopDismissMonitoring()
+    }
+
+    /// A global monitor fires for clicks in *other* apps (not our own status
+    /// item or popover), so clicking away closes the popover while the status
+    /// item click keeps toggling it.
+    private func startDismissMonitoring() {
+        if globalClickMonitor == nil {
+            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                Task { @MainActor in
+                    self?.closePopover()
+                }
+            }
+        }
+
+        if appResignObserver == nil {
+            appResignObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.closePopover()
+                }
+            }
         }
     }
 
-    private func panelFrame(below button: NSStatusBarButton) -> NSRect {
-        let screen = button.window?.screen ?? NSScreen.main
-        let visibleFrame = screen?.visibleFrame ?? NSScreen.screens.first?.visibleFrame ?? .zero
-        let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
-        let margin: CGFloat = 8
-        let size = panelContentSize
+    private func stopDismissMonitoring() {
+        if let globalClickMonitor {
+            NSEvent.removeMonitor(globalClickMonitor)
+            self.globalClickMonitor = nil
+        }
 
-        let x = clamp(
-            buttonFrame.midX - size.width / 2,
-            min: visibleFrame.minX + margin,
-            max: visibleFrame.maxX - size.width - margin
-        )
-
-        let y = min(
-            buttonFrame.minY - size.height - margin,
-            visibleFrame.maxY - size.height - margin
-        )
-
-        return NSRect(
-            x: x,
-            y: max(y, visibleFrame.minY + margin),
-            width: size.width,
-            height: size.height
-        )
-    }
-
-    private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
-        Swift.min(Swift.max(value, minimum), maximum)
+        if let appResignObserver {
+            NotificationCenter.default.removeObserver(appResignObserver)
+            self.appResignObserver = nil
+        }
     }
 
     private func showConfigWindow() {
+        closePopover()
+
         if let window = configWindowController?.window {
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
@@ -219,41 +222,5 @@ final class StatusItemController: NSObject {
         configWindowController = controller
         controller.showWindow(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-
-}
-
-final class AgentPulsePanel: NSPanel {
-    var didOrderOut: (() -> Void)?
-
-    init() {
-        super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 360),
-            styleMask: [.borderless, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-
-        backgroundColor = .clear
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        hasShadow = true
-        hidesOnDeactivate = true
-        isMovableByWindowBackground = false
-        isOpaque = false
-        isReleasedWhenClosed = false
-        level = .floating
-    }
-
-    override var canBecomeKey: Bool {
-        true
-    }
-
-    override var canBecomeMain: Bool {
-        true
-    }
-
-    override func orderOut(_ sender: Any?) {
-        super.orderOut(sender)
-        didOrderOut?()
     }
 }
