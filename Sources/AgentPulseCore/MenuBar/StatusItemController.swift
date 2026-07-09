@@ -10,6 +10,7 @@ final class StatusItemController: NSObject {
     private let popover = NSPopover()
     private let pillsView = MenuBarPillsView()
     private var configWindowController: NSWindowController?
+    private var pinnedPanel: PinnedOverlayPanel?
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
     private var globalClickMonitor: Any?
@@ -78,12 +79,23 @@ final class StatusItemController: NSObject {
     }
 
     private func configureHotKey() {
-        hotKey = GlobalHotKey(
-            keyCode: UInt32(kVK_ANSI_1),
-            modifiers: UInt32(cmdKey | shiftKey)
-        ) { [weak self] in
-            self?.togglePopover()
+        hotKey = GlobalHotKey { [weak self] in
+            self?.togglePinnedPanel()
         }
+        applyHotkeyShortcut()
+
+        runtime.hotkeySettings.objectWillChange
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.applyHotkeyShortcut()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyHotkeyShortcut() {
+        let shortcut = runtime.hotkeySettings.shortcut
+        hotKey?.register(keyCode: UInt32(shortcut.keyCode), modifiers: shortcut.carbonModifiers)
     }
 
     private func bindUpdates() {
@@ -195,6 +207,54 @@ final class StatusItemController: NSObject {
         }
     }
 
+    // MARK: - Pinned overlay (hotkey)
+
+    private func togglePinnedPanel() {
+        if let pinnedPanel, pinnedPanel.isVisible {
+            pinnedPanel.orderOut(nil)
+            return
+        }
+
+        closePopover()
+
+        let panel = pinnedPanel ?? makePinnedPanel()
+        pinnedPanel = panel
+        positionPinnedPanel(panel)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func makePinnedPanel() -> PinnedOverlayPanel {
+        // The overlay stays above other apps (hidesOnDeactivate = false), so it
+        // needs its own material background and rounded corners (unlike the
+        // popover, which supplies its own chrome).
+        let rootView = AnyView(
+            makeDropdownView()
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        )
+        let hostingController = NSHostingController(rootView: rootView)
+        let panel = PinnedOverlayPanel(contentViewController: hostingController)
+        panel.setContentSize(NSSize(width: 360, height: max(hostingController.view.fittingSize.height, 200)))
+        return panel
+    }
+
+    private func positionPinnedPanel(_ panel: NSPanel) {
+        guard let button = statusItem.button, let buttonWindow = button.window else {
+            panel.center()
+            return
+        }
+
+        let buttonOnScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let size = panel.frame.size
+        let visibleFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let margin: CGFloat = 8
+
+        let x = min(max(buttonOnScreen.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
+        let y = min(buttonOnScreen.minY - size.height - margin, visibleFrame.maxY - size.height - margin)
+        panel.setFrameOrigin(NSPoint(x: x, y: max(y, visibleFrame.minY + margin)))
+    }
+
     private func showConfigWindow() {
         closePopover()
 
@@ -205,7 +265,11 @@ final class StatusItemController: NSObject {
         }
 
         let hostingController = NSHostingController(
-            rootView: AgentPulseConfigView(runtime: runtime, appearance: runtime.appearance)
+            rootView: AgentPulseConfigView(
+                runtime: runtime,
+                appearance: runtime.appearance,
+                hotkeySettings: runtime.hotkeySettings
+            )
         )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
@@ -223,4 +287,29 @@ final class StatusItemController: NSObject {
         controller.showWindow(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
+}
+
+/// A borderless, draggable panel that floats above other apps and does not hide
+/// when Agent Pulse is deactivated, so the hotkey overlay stays pinned.
+final class PinnedOverlayPanel: NSPanel {
+    init(contentViewController: NSViewController) {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 360),
+            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        self.contentViewController = contentViewController
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        level = .floating
+        hidesOnDeactivate = false
+        isMovableByWindowBackground = true
+        isReleasedWhenClosed = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+
+    override var canBecomeKey: Bool { true }
 }
