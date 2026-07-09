@@ -48,6 +48,7 @@ struct AgentStatusPanel: View {
         }
         .padding(16)
         .frame(width: 360)
+        .agentPulseFont(size: 13)
     }
 
     private var header: some View {
@@ -56,9 +57,9 @@ struct AgentStatusPanel: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Agent Pulse")
-                    .font(.headline)
+                    .agentPulseFont(size: 16)
                 Text(UsageWindowFormatter.lastUpdatedText(usageStore.lastUpdated, now: store.now))
-                    .font(.caption)
+                    .agentPulseFont(size: 11)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

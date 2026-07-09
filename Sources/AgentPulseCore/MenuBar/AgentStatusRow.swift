@@ -16,10 +16,10 @@ struct AgentStatusRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(snapshot.agent.displayName)
-                        .font(.headline)
+                        .agentPulseFont(size: 15)
                     Spacer()
                     Text(effectiveState.displayName)
-                        .font(.caption)
+                        .agentPulseFont(size: 11)
                         .foregroundStyle(effectiveState.color)
                 }
 
@@ -30,7 +30,7 @@ struct AgentStatusRow: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .font(.caption)
+                .agentPulseFont(size: 11)
                 .foregroundStyle(.secondary)
 
                 HStack(spacing: 6) {
@@ -40,7 +40,7 @@ struct AgentStatusRow: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                .font(.caption)
+                .agentPulseFont(size: 11)
                 .foregroundStyle(.secondary)
 
                 usageSection
@@ -63,7 +63,7 @@ struct AgentStatusRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            .font(.caption)
+            .agentPulseFont(size: 11)
             .foregroundStyle(.secondary)
         } else {
             HStack(spacing: 6) {
@@ -71,7 +71,7 @@ struct AgentStatusRow: View {
                     .controlSize(.small)
                 Text("Loading usage…")
             }
-            .font(.caption)
+            .agentPulseFont(size: 11)
             .foregroundStyle(.secondary)
         }
     }

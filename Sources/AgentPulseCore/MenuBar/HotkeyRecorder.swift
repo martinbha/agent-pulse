@@ -14,7 +14,7 @@ struct HotkeyRecorder: View {
         HStack(spacing: 8) {
             Button(action: toggleRecording) {
                 Text(isRecording ? "Press keys…" : settings.shortcut.displayString)
-                    .font(.system(.body, design: .monospaced))
+                    .agentPulseFont(size: 13)
                     .frame(minWidth: 90)
             }
 

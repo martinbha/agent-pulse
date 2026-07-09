@@ -8,7 +8,7 @@ struct BrandColorSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Colors")
-                .font(.headline)
+                .agentPulseFont(size: 15)
 
             ForEach(AgentKind.allCases) { agent in
                 HStack(spacing: 10) {
