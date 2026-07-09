@@ -10,8 +10,8 @@ struct MenuBarPill: Equatable, Sendable {
 }
 
 enum MenuBarPillBuilder {
-    /// Formats the 5-hour usage percentage as a plain integer, or "--" when no
-    /// usage is available (not logged in, fetch failed, still loading).
+    /// Formats a usage percentage as a plain integer, or "--" when no usage is
+    /// available (not logged in, fetch failed, still loading).
     static func usageText(for usedPercentage: Double?) -> String {
         guard let usedPercentage else {
             return "--"
@@ -19,15 +19,22 @@ enum MenuBarPillBuilder {
         return String(Int(usedPercentage.rounded()))
     }
 
+    /// The pill's right-half text: 5-hour and weekly usage as "5h/weekly",
+    /// e.g. "0/56" or "--/--".
+    static func combinedUsageText(fiveHour: Double?, weekly: Double?) -> String {
+        "\(usageText(for: fiveHour))/\(usageText(for: weekly))"
+    }
+
     static func pill(
         agent: AgentKind,
         effectiveState: AgentState,
-        usedPercentage: Double?
+        fiveHour: Double?,
+        weekly: Double?
     ) -> MenuBarPill {
         MenuBarPill(
             agent: agent,
             label: agent.pillLabel,
-            usageText: usageText(for: usedPercentage),
+            usageText: combinedUsageText(fiveHour: fiveHour, weekly: weekly),
             state: effectiveState
         )
     }

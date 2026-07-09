@@ -122,10 +122,12 @@ final class StatusItemController: NSObject {
 
         let snapshots = runtime.store.orderedSnapshots
         pillsView.pills = snapshots.map { snapshot in
-            MenuBarPillBuilder.pill(
+            let usage = runtime.usageStore.snapshot(for: snapshot.agent)
+            return MenuBarPillBuilder.pill(
                 agent: snapshot.agent,
                 effectiveState: runtime.store.effectiveState(for: snapshot),
-                usedPercentage: runtime.usageStore.snapshot(for: snapshot.agent).fiveHour.usedPercentage
+                fiveHour: usage.fiveHour.usedPercentage,
+                weekly: usage.weekly.usedPercentage
             )
         }
         statusItem.length = pillsView.fittingWidth()
