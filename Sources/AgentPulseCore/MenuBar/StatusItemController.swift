@@ -8,7 +8,6 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
-    private let pillsView = MenuBarPillsView()
     private var configWindowController: NSWindowController?
     private var pinnedPanel: PinnedOverlayPanel?
     private var hotKey: GlobalHotKey?
@@ -43,19 +42,12 @@ final class StatusItemController: NSObject {
             return
         }
 
-        button.image = nil
         button.title = ""
+        button.imagePosition = .imageOnly
         button.target = self
         button.action = #selector(handleStatusItemClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
-
-        pillsView.brandColor = { [weak runtime] agent in
-            runtime?.appearance.nsColor(for: agent) ?? agent.brandAccentNSColor
-        }
-        pillsView.frame = button.bounds
-        pillsView.autoresizingMask = [.width, .height]
-        button.addSubview(pillsView)
     }
 
     private func configurePopover() {
@@ -121,7 +113,7 @@ final class StatusItemController: NSObject {
         }
 
         let snapshots = runtime.store.orderedSnapshots
-        pillsView.pills = snapshots.map { snapshot in
+        let pills = snapshots.map { snapshot in
             let usage = runtime.usageStore.snapshot(for: snapshot.agent)
             return MenuBarPillBuilder.pill(
                 agent: snapshot.agent,
@@ -130,10 +122,7 @@ final class StatusItemController: NSObject {
                 weekly: usage.weekly.usedPercentage
             )
         }
-        statusItem.length = pillsView.fittingWidth()
-        // The pill model is unchanged when only a brand color changes, so force
-        // a repaint to pick up a new custom color.
-        pillsView.needsDisplay = true
+        renderPills(pills, into: button)
 
         button.toolTip = snapshots
             .map { snapshot in
@@ -144,6 +133,32 @@ final class StatusItemController: NSObject {
                 return "\(snapshot.agent.displayName): \(state.displayName) · 5h \(fiveHour)% · week \(weekly)%"
             }
             .joined(separator: "\n")
+    }
+
+    private func renderPills(_ pills: [MenuBarPill], into button: NSStatusBarButton) {
+        let measuringFont = AgentPulseFont.nsFont(size: MenuBarPillsContent.fontSize, weight: .semibold)
+        let widths = MenuBarPillLayout.sectionWidths(pills: pills) { text in
+            (text as NSString).size(withAttributes: [.font: measuringFont]).width
+        }
+
+        let content = MenuBarPillsContent(
+            pills: pills,
+            brandColor: { [weak runtime] agent in
+                Color(nsColor: runtime?.appearance.nsColor(for: agent) ?? agent.brandAccentNSColor)
+            },
+            labelSectionWidth: widths.label,
+            usageSectionWidth: widths.usage
+        )
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+
+        guard let image = renderer.nsImage else {
+            return
+        }
+        image.isTemplate = false
+        button.image = image
+        statusItem.length = image.size.width
     }
 
     @objc private func handleStatusItemClick(_ sender: Any?) {

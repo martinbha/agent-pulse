@@ -2,11 +2,13 @@ import Foundation
 
 /// One menu bar pill: an agent's two-letter label, its 5-hour usage number,
 /// and the effective work state that colors the pill's left half.
-struct MenuBarPill: Equatable, Sendable {
+struct MenuBarPill: Equatable, Sendable, Identifiable {
     let agent: AgentKind
     let label: String
     let usageText: String
     let state: AgentState
+
+    var id: AgentKind { agent }
 }
 
 enum MenuBarPillBuilder {
