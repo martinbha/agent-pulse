@@ -6,6 +6,7 @@ final class AgentPulseRuntime: ObservableObject {
     let usageStore: UsageStore
     let settings: AgentPulseSettings
     let appearance: AppearanceSettings
+    let hotkeySettings: HotkeySettings
 
     @Published private(set) var serverStatus = "Starting local server..."
 
@@ -30,7 +31,8 @@ final class AgentPulseRuntime: ObservableObject {
             store: AgentStatusStore(),
             usageStore: UsageStore(),
             settings: AgentPulseSettings(),
-            appearance: AppearanceSettings()
+            appearance: AppearanceSettings(),
+            hotkeySettings: HotkeySettings()
         )
     }
 
@@ -38,12 +40,14 @@ final class AgentPulseRuntime: ObservableObject {
         store: AgentStatusStore,
         usageStore: UsageStore,
         settings: AgentPulseSettings,
-        appearance: AppearanceSettings
+        appearance: AppearanceSettings,
+        hotkeySettings: HotkeySettings
     ) {
         self.store = store
         self.usageStore = usageStore
         self.settings = settings
         self.appearance = appearance
+        self.hotkeySettings = hotkeySettings
         self.notificationService = AgentNotificationService()
 
         startServer()
