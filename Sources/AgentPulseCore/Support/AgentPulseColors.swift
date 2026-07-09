@@ -37,6 +37,23 @@ enum AgentPulseColors {
             return pillStaleNS
         }
     }
+
+    static func pillStatusFill(for state: AgentState, brand: Color) -> Color {
+        switch state {
+        case .idle, .unknown:
+            return brand
+        case .working:
+            return Color(nsColor: pillWorkingNS)
+        case .done:
+            return Color(nsColor: pillDoneNS)
+        case .failed:
+            return Color(nsColor: pillFailedNS)
+        case .waiting:
+            return Color(nsColor: pillWaitingNS)
+        case .stale:
+            return Color(nsColor: pillStaleNS)
+        }
+    }
 }
 
 extension AgentKind {
