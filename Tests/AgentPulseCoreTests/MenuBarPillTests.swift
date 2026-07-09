@@ -14,20 +14,27 @@ import Testing
         #expect(MenuBarPillBuilder.usageText(for: nil) == "--")
     }
 
+    @Test func combinedUsageJoinsFiveHourAndWeekly() {
+        #expect(MenuBarPillBuilder.combinedUsageText(fiveHour: 0, weekly: 56) == "0/56")
+        #expect(MenuBarPillBuilder.combinedUsageText(fiveHour: 34, weekly: nil) == "34/--")
+        #expect(MenuBarPillBuilder.combinedUsageText(fiveHour: nil, weekly: 67) == "--/67")
+        #expect(MenuBarPillBuilder.combinedUsageText(fiveHour: nil, weekly: nil) == "--/--")
+    }
+
     @Test func pillCarriesLabelUsageAndState() {
-        let pill = MenuBarPillBuilder.pill(agent: .claude, effectiveState: .working, usedPercentage: 34)
+        let pill = MenuBarPillBuilder.pill(agent: .claude, effectiveState: .working, fiveHour: 34, weekly: 67)
 
         #expect(pill.agent == .claude)
         #expect(pill.label == "Cl")
-        #expect(pill.usageText == "34")
+        #expect(pill.usageText == "34/67")
         #expect(pill.state == .working)
     }
 
     @Test func codexPillUsesCodexLabel() {
-        let pill = MenuBarPillBuilder.pill(agent: .codex, effectiveState: .idle, usedPercentage: nil)
+        let pill = MenuBarPillBuilder.pill(agent: .codex, effectiveState: .idle, fiveHour: nil, weekly: nil)
 
         #expect(pill.label == "Cx")
-        #expect(pill.usageText == "--")
+        #expect(pill.usageText == "--/--")
     }
 }
 

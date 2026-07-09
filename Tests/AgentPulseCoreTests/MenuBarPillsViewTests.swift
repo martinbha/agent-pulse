@@ -14,12 +14,12 @@ import Testing
     @Test func widthGrowsWithEachPill() {
         let view = MenuBarPillsView()
 
-        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, usedPercentage: 34)]
+        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, fiveHour: 34, weekly: nil)]
         let oneWidth = view.fittingWidth()
 
         view.pills = [
-            MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, usedPercentage: 34),
-            MenuBarPillBuilder.pill(agent: .codex, effectiveState: .idle, usedPercentage: 40),
+            MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, fiveHour: 34, weekly: nil),
+            MenuBarPillBuilder.pill(agent: .codex, effectiveState: .idle, fiveHour: 40, weekly: nil),
         ]
         let twoWidth = view.fittingWidth()
 
@@ -29,7 +29,7 @@ import Testing
 
     @Test func intrinsicSizeMatchesFittingWidth() {
         let view = MenuBarPillsView()
-        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .working, usedPercentage: 100)]
+        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .working, fiveHour: 100, weekly: nil)]
 
         #expect(view.intrinsicContentSize.width == view.fittingWidth())
     }
@@ -39,10 +39,10 @@ import Testing
         // for the longest of label/usage in each half.
         let view = MenuBarPillsView()
 
-        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, usedPercentage: 5)]
+        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, fiveHour: 5, weekly: nil)]
         let narrow = view.fittingWidth()
 
-        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, usedPercentage: 100)]
+        view.pills = [MenuBarPillBuilder.pill(agent: .claude, effectiveState: .idle, fiveHour: 100, weekly: nil)]
         let wide = view.fittingWidth()
 
         #expect(wide > narrow)
