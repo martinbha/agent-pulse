@@ -23,9 +23,22 @@ final class AgentStatusStore: ObservableObject {
         let loaded = (try? persistence.load()) ?? [:]
         var initial: [AgentKind: AgentStatusSnapshot] = [:]
         for agent in AgentKind.allCases {
-            initial[agent] = loaded[agent] ?? .idle(agent: agent)
+            initial[agent] = loaded[agent].map(Self.restored(_:)) ?? .idle(agent: agent)
         }
         self.snapshots = initial
+    }
+
+    /// After a restart there is no live agent session, so a restored
+    /// in-progress state (`working`/`waiting`) would immediately read as stale.
+    /// Start those idle and wait for fresh events; terminal states are kept
+    /// (`done` fades to idle on its own).
+    private static func restored(_ snapshot: AgentStatusSnapshot) -> AgentStatusSnapshot {
+        switch snapshot.state {
+        case .working, .waiting:
+            return .idle(agent: snapshot.agent)
+        default:
+            return snapshot
+        }
     }
 
     var orderedSnapshots: [AgentStatusSnapshot] {
