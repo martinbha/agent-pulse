@@ -1,20 +1,26 @@
 import SwiftUI
 
-/// A single usage window rendered as a labeled bar with a trailing
-/// "42% · 3h 06m" detail. Uses a plain capsule fill (not `ProgressView`) so it
-/// renders at its final width immediately without an animated sweep each time
-/// the dropdown opens.
+/// A single usage window shown in two tiers: a stats row (label on the left,
+/// used percentage + time-remaining countdown on the right) above a full-width
+/// bar. The plain capsule fill (not `ProgressView`) renders at its final width
+/// immediately, with no animated sweep each time the dropdown opens.
 struct UsageBar: View {
     let label: String
     let window: UsageWindow
     let accent: Color
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .agentPulseFont(size: 10)
-                .foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .agentPulseFont(size: 11)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(stats)
+                    .agentPulseFont(size: 11)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -26,12 +32,6 @@ struct UsageBar: View {
                 }
             }
             .frame(height: 5)
-
-            Text(detail)
-                .agentPulseFont(size: 10)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .fixedSize()
         }
         .transaction { $0.animation = nil }
     }
@@ -40,7 +40,7 @@ struct UsageBar: View {
         CGFloat(UsageWindowFormatter.fraction(window.usedPercentage))
     }
 
-    private var detail: String {
+    private var stats: String {
         UsageWindowFormatter.detailLine(for: window) ?? "--"
     }
 }
