@@ -23,6 +23,7 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BIN_PATH" "$MACOS_DIR/$APP_NAME"
 cp "$ROOT_DIR/Sources/AgentPulseCore/Resources/working-verbs.txt" "$RESOURCES_DIR/working-verbs.txt"
+cp "$ROOT_DIR/Sources/AgentPulseCore/Resources/KeepCalm-Medium.ttf" "$RESOURCES_DIR/KeepCalm-Medium.ttf"
 cp "$APP_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-icon.svg"
 cp "$MENU_BAR_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-menubar.svg"
 

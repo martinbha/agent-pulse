@@ -56,6 +56,6 @@ struct SettingsSummary: View {
                 }
             }
         }
-        .font(.caption)
+        .agentPulseFont(size: 11)
     }
 }

@@ -22,7 +22,7 @@ final class MenuBarPillsView: NSView {
     private let pillSpacing: CGFloat = 5
     private let sideMargin: CGFloat = 2
 
-    private static let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+    private static var font: NSFont { AgentPulseFont.nsFont(size: 11, weight: .semibold) }
 
     override var isFlipped: Bool { false }
 

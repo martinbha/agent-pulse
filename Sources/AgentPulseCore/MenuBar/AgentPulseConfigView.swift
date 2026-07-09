@@ -21,21 +21,21 @@ struct AgentPulseConfigView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Overlay Shortcut")
-                    .font(.headline)
+                    .agentPulseFont(size: 15)
                 HStack {
                     Text("Toggle pinned overlay")
                         .foregroundStyle(.secondary)
                     Spacer()
                     HotkeyRecorder(settings: hotkeySettings)
                 }
-                .font(.callout)
+                .agentPulseFont(size: 12)
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Test Events")
-                    .font(.headline)
+                    .agentPulseFont(size: 15)
 
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
@@ -92,14 +92,15 @@ struct AgentPulseConfigView: View {
         }
         .padding(20)
         .frame(width: 460)
+        .agentPulseFont(size: 13)
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Agent Pulse Config")
-                .font(.title2.bold())
+                .agentPulseFont(size: 20)
             Text(runtime.serverStatus)
-                .font(.subheadline)
+                .agentPulseFont(size: 13)
                 .foregroundStyle(.secondary)
         }
     }

@@ -12,7 +12,7 @@ struct UsageBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.caption2)
+                .agentPulseFont(size: 10)
                 .foregroundStyle(.secondary)
                 .frame(width: 30, alignment: .leading)
 
@@ -28,7 +28,7 @@ struct UsageBar: View {
             .frame(height: 5)
 
             Text(detail)
-                .font(.caption2)
+                .agentPulseFont(size: 10)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .fixedSize()
