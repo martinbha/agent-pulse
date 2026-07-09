@@ -20,27 +20,29 @@ import Testing
     }
 }
 
-@Suite struct UsageResetFormattingTests {
-    @Test func fiveHourShowsClockTime() {
-        let text = UsageWindowFormatterFixtures.fiveHourResetText()
-
-        #expect(text?.hasPrefix("resets ") == true)
-        #expect(text?.contains("4:30") == true)
+@Suite struct UsageResetCountdownTests {
+    @Test func showsDaysHoursMinutes() {
+        #expect(UsageWindowFormatterFixtures.countdownDaysHoursMinutes() == "4d 5h 30m")
     }
 
-    @Test func weeklyShowsWeekday() {
-        #expect(UsageWindowFormatterFixtures.weeklyResetText() == "resets Wed")
+    @Test func showsHoursAndZeroPaddedMinutes() {
+        #expect(UsageWindowFormatterFixtures.countdownHoursMinutes() == "3h 06m")
     }
 
-    @Test func resetTextNilWithoutDate() {
-        #expect(UsageWindowFormatterFixtures.resetTextIsNilWithoutDate())
+    @Test func showsMinutesOnlyWhenUnderAnHour() {
+        #expect(UsageWindowFormatterFixtures.countdownMinutesOnly() == "05m")
     }
 
-    @Test func detailLineJoinsPercentAndReset() {
-        let text = UsageWindowFormatterFixtures.detailLineFull()
+    @Test func showsLessThanAMinute() {
+        #expect(UsageWindowFormatterFixtures.countdownUnderAMinute() == "<1m")
+    }
 
-        #expect(text?.contains("42%") == true)
-        #expect(text?.contains(" · resets ") == true)
+    @Test func alreadyResetShowsLessThanAMinute() {
+        #expect(UsageWindowFormatterFixtures.countdownAlreadyReset() == "<1m")
+    }
+
+    @Test func detailLineJoinsPercentAndCountdown() {
+        #expect(UsageWindowFormatterFixtures.detailLineFull() == "42% · 3h 06m")
     }
 
     @Test func detailLineFallsBackToPercentOnly() {
