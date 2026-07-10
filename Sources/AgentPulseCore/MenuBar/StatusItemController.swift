@@ -8,8 +8,11 @@ final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
+    private var popoverHostingController: NSHostingController<AnyView>?
+    private weak var popoverBackgroundView: NSView?
     private var configWindowController: NSWindowController?
     private var pinnedPanel: PinnedOverlayPanel?
+    private var pinnedHostingController: NSHostingController<AnyView>?
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
     private var globalClickMonitor: Any?
@@ -55,7 +58,14 @@ final class StatusItemController: NSObject {
         // the status-item click itself, so the toggle below stays in control.
         popover.behavior = .semitransient
         popover.animates = false
-        popover.contentViewController = NSHostingController(rootView: makeDropdownView())
+
+        let hostingController = NSHostingController(rootView: AnyView(makeDropdownView()))
+        // We size the surfaces explicitly before showing them; automatic
+        // preferred-size updates would resize the window *after* it has been
+        // positioned, growing it upward past the menu bar.
+        hostingController.sizingOptions = []
+        popoverHostingController = hostingController
+        popover.contentViewController = hostingController
     }
 
     private func makeDropdownView() -> AgentStatusPanel {
@@ -176,9 +186,49 @@ final class StatusItemController: NSObject {
         }
 
         closePinnedPanel()
+        popover.contentSize = dropdownContentSize(for: popoverHostingController)
         NSApplication.shared.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        installPopoverBackgroundIfNeeded()
         startDismissMonitoring()
+    }
+
+    /// Recolors the popover by painting its frame view's layer — the
+    /// documented way to restyle an NSPopover: the frame view draws the whole
+    /// popover shape (arrow included), and a plain layer color doesn't vary
+    /// with the window's focus state the way the built-in material does. The
+    /// popover's own blur stays underneath, matching the pinned panel's
+    /// blur + tint + sheen stack.
+    private func installPopoverBackgroundIfNeeded() {
+        guard let frameView = popover.contentViewController?.view.window?.contentView?.superview else {
+            return
+        }
+
+        frameView.wantsLayer = true
+        frameView.layer?.backgroundColor = DropdownSurface.tintColor.cgColor
+
+        if popoverBackgroundView?.superview !== frameView {
+            let sheen = DropdownSheenView(frame: frameView.bounds)
+            sheen.autoresizingMask = [.width, .height]
+            frameView.addSubview(sheen, positioned: .below, relativeTo: nil)
+            popoverBackgroundView = sheen
+        }
+    }
+
+    /// Measures the dropdown content at the moment of showing, clamped to the
+    /// visible screen so the surface can never extend past the menu bar or off
+    /// screen. Asks SwiftUI's layout directly (`sizeThatFits`) — with automatic
+    /// sizing disabled, the hosting view's `fittingSize` has no constraints to
+    /// answer from and undersizes.
+    private func dropdownContentSize(for hostingController: NSHostingController<AnyView>?) -> NSSize {
+        let width: CGFloat = 360
+        guard let hostingController else {
+            return NSSize(width: width, height: 400)
+        }
+
+        let fitted = hostingController.sizeThatFits(in: NSSize(width: width, height: 10_000))
+        let maxHeight = (NSScreen.main?.visibleFrame.height ?? 800) - 20
+        return NSSize(width: width, height: min(max(fitted.height, 200), maxHeight))
     }
 
     private func closePopover() {
@@ -239,6 +289,10 @@ final class StatusItemController: NSObject {
 
         let panel = pinnedPanel ?? makePinnedPanel()
         pinnedPanel = panel
+        // Size to the current content before positioning: position math uses
+        // the panel's frame, and a late auto-resize would grow the window
+        // upward past the menu bar.
+        panel.setContentSize(dropdownContentSize(for: pinnedHostingController))
         positionPinnedPanel(panel)
         NSApplication.shared.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -254,13 +308,16 @@ final class StatusItemController: NSObject {
         // popover, which supplies its own chrome).
         let rootView = AnyView(
             makeDropdownView()
-                .background(.regularMaterial)
+                .background(DropdownBackground())
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         )
         let hostingController = NSHostingController(rootView: rootView)
-        let panel = PinnedOverlayPanel(contentViewController: hostingController)
-        panel.setContentSize(NSSize(width: 360, height: max(hostingController.view.fittingSize.height, 200)))
-        return panel
+        // Sizing is done explicitly in togglePinnedPanel before positioning;
+        // automatic preferred-size updates would resize the already-placed
+        // window upward past the menu bar.
+        hostingController.sizingOptions = []
+        pinnedHostingController = hostingController
+        return PinnedOverlayPanel(contentViewController: hostingController)
     }
 
     private func positionPinnedPanel(_ panel: NSPanel) {
