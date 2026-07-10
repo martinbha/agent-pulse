@@ -15,7 +15,10 @@ struct AgentStatusPanel: View {
             Divider()
 
             VStack(spacing: 12) {
-                ForEach(store.orderedSnapshots) { snapshot in
+                ForEach(Array(store.orderedSnapshots.enumerated()), id: \.element.id) { index, snapshot in
+                    if index > 0 {
+                        Divider()
+                    }
                     AgentStatusRow(
                         snapshot: snapshot,
                         effectiveState: store.effectiveState(for: snapshot),
