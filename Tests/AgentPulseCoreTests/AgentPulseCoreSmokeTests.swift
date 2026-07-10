@@ -23,6 +23,12 @@ import Testing
         #expect(TestFixtures.effectiveState(of: snapshot) == .stale)
     }
 
+    @Test func effectiveStateFadesStaleToIdle() {
+        let snapshot = TestFixtures.snapshot(state: .working, event: "PreToolUse", age: 1000)
+
+        #expect(TestFixtures.effectiveState(of: snapshot) == .idle)
+    }
+
     @Test func effectiveStateFadesDoneToIdle() {
         let snapshot = TestFixtures.snapshot(state: .done, event: "Stop", age: 60)
 

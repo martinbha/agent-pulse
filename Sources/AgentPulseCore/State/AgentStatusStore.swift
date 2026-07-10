@@ -46,8 +46,23 @@ final class AgentStatusStore: ObservableObject {
     }
 
     func ingest(_ event: AgentEvent) {
+        guard !shouldIgnore(event) else {
+            return
+        }
         snapshots[event.agent] = AgentStatusSnapshot(event: event)
         save()
+    }
+
+    /// A `SubagentStop` can arrive *after* the main turn's `Stop` (a subagent
+    /// finishing late). It means work is winding down, so it may keep an
+    /// active agent alive but must never resurrect a settled one back to
+    /// "working" — that left agents aging into stale while actually idle.
+    private func shouldIgnore(_ event: AgentEvent) -> Bool {
+        guard event.event == "SubagentStop" else {
+            return false
+        }
+        let current = snapshots[event.agent]?.state
+        return current != .working && current != .stale
     }
 
     func clearCompleted() {

@@ -24,3 +24,22 @@ import Testing
         #expect(AgentStatusStoreFixtures.restoredState(from: .failed) == .failed)
     }
 }
+
+@MainActor
+@Suite struct SubagentStopIngestTests {
+    @Test func keepsWorkingAgentWorking() {
+        #expect(AgentStatusStoreFixtures.stateAfterSubagentStop(from: .working) == .working)
+    }
+
+    @Test func doesNotResurrectIdleAgent() {
+        #expect(AgentStatusStoreFixtures.stateAfterSubagentStop(from: .idle) == .idle)
+    }
+
+    @Test func doesNotResurrectDoneAgent() {
+        #expect(AgentStatusStoreFixtures.stateAfterSubagentStop(from: .done) == .done)
+    }
+
+    @Test func doesNotResurrectWaitingAgent() {
+        #expect(AgentStatusStoreFixtures.stateAfterSubagentStop(from: .waiting) == .waiting)
+    }
+}

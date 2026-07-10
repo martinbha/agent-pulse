@@ -26,4 +26,32 @@ enum AgentStatusStoreFixtures {
         let store = AgentStatusStore(persistence: persistence)
         return store.snapshots[agent]?.state ?? .unknown
     }
+
+    /// Builds a store with the agent in `initialState` (via a first event when
+    /// non-idle), ingests a SubagentStop, and returns the resulting state.
+    @MainActor
+    static func stateAfterSubagentStop(from initialState: AgentState) -> AgentState {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agent-pulse-store-\(UUID().uuidString).json")
+        let store = AgentStatusStore(persistence: StatePersistence(fileURL: url))
+
+        if initialState != .idle {
+            store.ingest(event(state: initialState, name: "PreToolUse"))
+        }
+        store.ingest(event(state: .working, name: "SubagentStop"))
+        return store.snapshots[.claude]?.state ?? .unknown
+    }
+
+    private static func event(state: AgentState, name: String) -> AgentEvent {
+        AgentEvent(
+            agent: .claude,
+            state: state,
+            event: name,
+            sessionID: nil,
+            cwd: nil,
+            project: "demo",
+            timestamp: Date(),
+            source: "test"
+        )
+    }
 }
