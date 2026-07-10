@@ -7,9 +7,8 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
-    private let popover = NSPopover()
+    private var popoverPanel: AnchoredPopoverPanel?
     private var popoverHostingController: NSHostingController<AnyView>?
-    private weak var popoverBackgroundView: NSView?
     private var configWindowController: NSWindowController?
     private var pinnedPanel: PinnedOverlayPanel?
     private var pinnedHostingController: NSHostingController<AnyView>?
@@ -54,18 +53,14 @@ final class StatusItemController: NSObject {
     }
 
     private func configurePopover() {
-        // .semitransient dismisses on interaction with other windows but not on
-        // the status-item click itself, so the toggle below stays in control.
-        popover.behavior = .semitransient
-        popover.animates = false
-
-        let hostingController = NSHostingController(rootView: AnyView(makeDropdownView()))
+        let rootView = AnyView(DropdownPopoverSurface(content: makeDropdownView()))
+        let hostingController = NSHostingController(rootView: rootView)
         // We size the surfaces explicitly before showing them; automatic
         // preferred-size updates would resize the window *after* it has been
         // positioned, growing it upward past the menu bar.
         hostingController.sizingOptions = []
         popoverHostingController = hostingController
-        popover.contentViewController = hostingController
+        popoverPanel = AnchoredPopoverPanel(contentViewController: hostingController)
     }
 
     private func makeDropdownView() -> AgentStatusPanel {
@@ -176,43 +171,27 @@ final class StatusItemController: NSObject {
     }
 
     private func togglePopover() {
-        guard let button = statusItem.button else {
-            return
-        }
-
-        if popover.isShown {
+        if let popoverPanel, popoverPanel.isVisible {
             closePopover()
             return
         }
 
         closePinnedPanel()
-        popover.contentSize = dropdownContentSize(for: popoverHostingController)
+        let panel = popoverPanel ?? makePopoverPanel()
+        popoverPanel = panel
+        panel.setContentSize(dropdownContentSize(for: popoverHostingController))
+        positionPopoverPanel(panel)
         NSApplication.shared.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        installPopoverBackgroundIfNeeded()
+        panel.makeKeyAndOrderFront(nil)
         startDismissMonitoring()
     }
 
-    /// Recolors the popover by painting its frame view's layer — the
-    /// documented way to restyle an NSPopover: the frame view draws the whole
-    /// popover shape (arrow included), and a plain layer color doesn't vary
-    /// with the window's focus state the way the built-in material does. The
-    /// popover's own blur stays underneath, matching the pinned panel's
-    /// blur + tint + sheen stack.
-    private func installPopoverBackgroundIfNeeded() {
-        guard let frameView = popover.contentViewController?.view.window?.contentView?.superview else {
-            return
-        }
-
-        frameView.wantsLayer = true
-        frameView.layer?.backgroundColor = DropdownSurface.tintColor.cgColor
-
-        if popoverBackgroundView?.superview !== frameView {
-            let sheen = DropdownSheenView(frame: frameView.bounds)
-            sheen.autoresizingMask = [.width, .height]
-            frameView.addSubview(sheen, positioned: .below, relativeTo: nil)
-            popoverBackgroundView = sheen
-        }
+    private func makePopoverPanel() -> AnchoredPopoverPanel {
+        let rootView = AnyView(DropdownPopoverSurface(content: makeDropdownView()))
+        let hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
+        popoverHostingController = hostingController
+        return AnchoredPopoverPanel(contentViewController: hostingController)
     }
 
     /// Measures the dropdown content at the moment of showing, clamped to the
@@ -232,17 +211,13 @@ final class StatusItemController: NSObject {
     }
 
     private func closePopover() {
-        if popover.isShown {
-            // close() is unconditional; performClose can be deferred while the
-            // hotkey event is being handled, leaving both dropdowns visible.
-            popover.close()
-        }
+        popoverPanel?.orderOut(nil)
         stopDismissMonitoring()
     }
 
     /// A global monitor fires for clicks in *other* apps (not our own status
-    /// item or popover), so clicking away closes the popover while the status
-    /// item click keeps toggling it.
+    /// item or custom panel), so clicking away closes the panel while the
+    /// status-item click keeps toggling it.
     private func startDismissMonitoring() {
         if globalClickMonitor == nil {
             globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -304,8 +279,8 @@ final class StatusItemController: NSObject {
 
     private func makePinnedPanel() -> PinnedOverlayPanel {
         // The overlay stays above other apps (hidesOnDeactivate = false), so it
-        // needs its own material background and rounded corners (unlike the
-        // popover, which supplies its own chrome).
+        // needs rounded corners (unlike the popover, which supplies its own
+        // chrome). Its content provides the shared opaque background.
         let rootView = AnyView(
             makeDropdownView()
                 .background(DropdownBackground())
@@ -333,6 +308,21 @@ final class StatusItemController: NSObject {
 
         let x = min(max(buttonOnScreen.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
         let y = min(buttonOnScreen.minY - size.height - margin, visibleFrame.maxY - size.height - margin)
+        panel.setFrameOrigin(NSPoint(x: x, y: max(y, visibleFrame.minY + margin)))
+    }
+
+    private func positionPopoverPanel(_ panel: NSPanel) {
+        guard let button = statusItem.button, let buttonWindow = button.window else {
+            panel.center()
+            return
+        }
+
+        let buttonOnScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let size = panel.frame.size
+        let visibleFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let margin: CGFloat = 8
+        let x = min(max(buttonOnScreen.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
+        let y = min(buttonOnScreen.minY - size.height, visibleFrame.maxY - size.height)
         panel.setFrameOrigin(NSPoint(x: x, y: max(y, visibleFrame.minY + margin)))
     }
 
@@ -388,6 +378,30 @@ final class PinnedOverlayPanel: NSPanel {
         level = .floating
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
+        isReleasedWhenClosed = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+
+    override var canBecomeKey: Bool { true }
+}
+
+/// A custom, status-item-anchored panel that draws its own arrow so the entire
+/// surface uses the same opaque background color.
+final class AnchoredPopoverPanel: NSPanel {
+    init(contentViewController: NSViewController) {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 360),
+            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        self.contentViewController = contentViewController
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        level = .statusBar
+        hidesOnDeactivate = false
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
