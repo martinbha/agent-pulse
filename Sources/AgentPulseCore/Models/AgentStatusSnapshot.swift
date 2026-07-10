@@ -58,11 +58,18 @@ struct AgentStatusSnapshot: Codable, Equatable, Identifiable, Sendable {
         )
     }
 
-    func effectiveState(now: Date, staleAfter: TimeInterval, doneFadeAfter: TimeInterval) -> AgentState {
+    func effectiveState(
+        now: Date,
+        staleAfter: TimeInterval,
+        doneFadeAfter: TimeInterval,
+        staleFadeAfter: TimeInterval = 900
+    ) -> AgentState {
         let age = now.timeIntervalSince(updatedAt)
 
         if state == .working && age > staleAfter {
-            return .stale
+            // Stale flags a session that went silent mid-work; after a longer
+            // grace it settles to idle rather than flagging forever.
+            return age > staleFadeAfter ? .idle : .stale
         }
 
         if state == .done && age > doneFadeAfter {

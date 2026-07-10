@@ -8,21 +8,30 @@ struct AgentStatusRow: View {
     var accent: Color
     var now: Date
 
+    private let dotSize: CGFloat = 12
+    private let detailIndent: CGFloat = 22
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            StatusDot(state: effectiveState, size: 16, innerColor: accent)
-                .padding(.top, 3)
+        VStack(alignment: .leading, spacing: 5) {
+            // Baseline-aligned so the dot tracks the title text itself; the
+            // display font's uneven line box makes plain center alignment sit
+            // the dot visibly high.
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Circle()
+                    .fill(accent)
+                    .frame(width: dotSize, height: dotSize)
+                    // Rest the circle on the baseline, centered on the title's
+                    // cap-height band.
+                    .alignmentGuide(.firstTextBaseline) { _ in dotSize - 1 }
+                Text(snapshot.agent.displayName)
+                    .agentPulseFont(size: 15)
+                Spacer()
+                Text(effectiveState.displayName)
+                    .agentPulseFont(size: 11)
+                    .foregroundStyle(effectiveState.color)
+            }
 
             VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(snapshot.agent.displayName)
-                        .agentPulseFont(size: 15)
-                    Spacer()
-                    Text(effectiveState.displayName)
-                        .agentPulseFont(size: 11)
-                        .foregroundStyle(effectiveState.color)
-                }
-
                 HStack(spacing: 6) {
                     Image(systemName: "folder")
                         .foregroundStyle(.secondary)
@@ -46,6 +55,7 @@ struct AgentStatusRow: View {
                 usageSection
                     .padding(.top, 2)
             }
+            .padding(.leading, detailIndent)
         }
     }
 
