@@ -72,12 +72,17 @@ struct AgentStatusPanel: View {
             Button {
                 Task { await usageStore.refresh(trigger: .manual) }
             } label: {
-                if usageStore.isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "arrow.clockwise")
+                // Fixed footprint so swapping between the icon and the spinner
+                // can't nudge the header (and thus the dropdown) size.
+                ZStack {
+                    if usageStore.isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
+                .frame(width: 20, height: 20)
             }
             .buttonStyle(.borderless)
             .disabled(usageStore.isRefreshing)

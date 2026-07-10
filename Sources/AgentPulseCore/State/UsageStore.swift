@@ -80,9 +80,11 @@ final class UsageStore: ObservableObject {
         let previous = snapshots
 
         if shouldForceCredentialRefresh {
+            // Keep showing the current numbers while the fetch runs — blanking
+            // to a loading placeholder mid-refresh makes the dropdown collapse
+            // and re-expand. The merge below still replaces them wholesale.
             for agent in AgentKind.allCases {
                 preservedFailureCounts[agent] = 0
-                snapshots[agent] = .loading(agent)
             }
         }
 
