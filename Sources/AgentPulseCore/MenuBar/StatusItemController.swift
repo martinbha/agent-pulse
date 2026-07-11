@@ -16,6 +16,10 @@ final class StatusItemController: NSObject {
     private var cancellables: Set<AnyCancellable> = []
     private var globalClickMonitor: Any?
     private var appResignObserver: NSObjectProtocol?
+    private var popoverPresentationID: UUID?
+    private var statusItemHitView: StatusItemHitView?
+    private var isStatusItemUpdatePending = false
+    private var renderedStatusItemState: StatusItemVisualState?
 
     init(runtime: AgentPulseRuntime) {
         self.runtime = runtime
@@ -46,10 +50,21 @@ final class StatusItemController: NSObject {
 
         button.title = ""
         button.imagePosition = .imageOnly
-        button.target = self
-        button.action = #selector(handleStatusItemClick(_:))
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Agent Pulse"
+
+        // The dropdown is a custom panel, not an NSMenu. Letting AppKit's
+        // status button track this click would briefly apply its native
+        // selected state, then clear it when mouse tracking ends. An overlay
+        // view keeps the status item visually neutral while still providing a
+        // normal click target for the custom panel.
+        let hitView = StatusItemHitView { [weak self] in
+            self?.togglePopover()
+        }
+        hitView.frame = button.bounds
+        hitView.autoresizingMask = [.width, .height]
+        hitView.toolTip = button.toolTip
+        button.addSubview(hitView)
+        statusItemHitView = hitView
     }
 
     private func configurePopover() {
@@ -104,11 +119,24 @@ final class StatusItemController: NSObject {
         ] {
             publisher
                 .sink { [weak self] _ in
-                    DispatchQueue.main.async {
-                        self?.updateStatusItem()
-                    }
+                    self?.scheduleStatusItemUpdate()
                 }
                 .store(in: &cancellables)
+        }
+    }
+
+    private func scheduleStatusItemUpdate() {
+        guard !isStatusItemUpdatePending else {
+            return
+        }
+
+        isStatusItemUpdatePending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            self.isStatusItemUpdatePending = false
+            self.updateStatusItem()
         }
     }
 
@@ -127,9 +155,21 @@ final class StatusItemController: NSObject {
                 weekly: usage.weekly.usedPercentage
             )
         }
-        renderPills(pills, into: button)
+        let visualState = StatusItemVisualState(
+            pills: pills,
+            brandColors: Dictionary(
+                uniqueKeysWithValues: AgentKind.allCases.map { agent in
+                    (agent, runtime.appearance.rgb(for: agent))
+                }
+            )
+        )
 
-        button.toolTip = snapshots
+        if visualState != renderedStatusItemState,
+           renderPills(visualState, into: button) {
+            renderedStatusItemState = visualState
+        }
+
+        let toolTip = snapshots
             .map { snapshot in
                 let state = runtime.store.effectiveState(for: snapshot)
                 let usage = runtime.usageStore.snapshot(for: snapshot.agent)
@@ -138,18 +178,23 @@ final class StatusItemController: NSObject {
                 return "\(snapshot.agent.displayName): \(state.displayName) · 5h \(fiveHour)% · week \(weekly)%"
             }
             .joined(separator: "\n")
+        if button.toolTip != toolTip {
+            button.toolTip = toolTip
+            statusItemHitView?.toolTip = toolTip
+        }
     }
 
-    private func renderPills(_ pills: [MenuBarPill], into button: NSStatusBarButton) {
+    @discardableResult
+    private func renderPills(_ state: StatusItemVisualState, into button: NSStatusBarButton) -> Bool {
         let measuringFont = AgentPulseFont.nsFont(size: MenuBarPillsContent.fontSize, weight: .semibold)
-        let widths = MenuBarPillLayout.sectionWidths(pills: pills) { text in
+        let widths = MenuBarPillLayout.sectionWidths(pills: state.pills) { text in
             (text as NSString).size(withAttributes: [.font: measuringFont]).width
         }
 
         let content = MenuBarPillsContent(
-            pills: pills,
-            brandColor: { [weak runtime] agent in
-                Color(nsColor: runtime?.appearance.nsColor(for: agent) ?? agent.brandAccentNSColor)
+            pills: state.pills,
+            brandColor: { agent in
+                Color(nsColor: state.brandColors[agent]?.nsColor ?? agent.brandAccentNSColor)
             },
             labelSectionWidth: widths.label,
             usageSectionWidth: widths.usage
@@ -159,15 +204,14 @@ final class StatusItemController: NSObject {
         renderer.scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
 
         guard let image = renderer.nsImage else {
-            return
+            return false
         }
         image.isTemplate = false
         button.image = image
-        statusItem.length = image.size.width
-    }
-
-    @objc private func handleStatusItemClick(_ sender: Any?) {
-        togglePopover()
+        if statusItem.length != image.size.width {
+            statusItem.length = image.size.width
+        }
+        return true
     }
 
     private func togglePopover() {
@@ -179,11 +223,15 @@ final class StatusItemController: NSObject {
         closePinnedPanel()
         let panel = popoverPanel ?? makePopoverPanel()
         popoverPanel = panel
+        let presentationID = UUID()
+        popoverPresentationID = presentationID
         panel.setContentSize(dropdownContentSize(for: popoverHostingController))
         positionPopoverPanel(panel)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        // This panel deliberately does not activate the app. The status item
+        // is a neutral custom click surface, so opening the panel never needs
+        // to manipulate NSStatusBarButton's native selected state.
         panel.makeKeyAndOrderFront(nil)
-        startDismissMonitoring()
+        startDismissMonitoring(for: presentationID)
     }
 
     private func makePopoverPanel() -> AnchoredPopoverPanel {
@@ -210,19 +258,24 @@ final class StatusItemController: NSObject {
         return NSSize(width: width, height: min(max(fitted.height, 200), maxHeight))
     }
 
-    private func closePopover() {
+    private func closePopover(presentationID: UUID? = nil) {
+        guard presentationID == nil || presentationID == popoverPresentationID else {
+            return
+        }
+
         popoverPanel?.orderOut(nil)
+        popoverPresentationID = nil
         stopDismissMonitoring()
     }
 
-    /// A global monitor fires for clicks in *other* apps (not our own status
-    /// item or custom panel), so clicking away closes the panel while the
-    /// status-item click keeps toggling it.
-    private func startDismissMonitoring() {
+    /// A global monitor closes the custom panel for clicks sent to other apps.
+    /// The presentation ID makes a delayed monitor callback harmless after the
+    /// user has reopened the panel.
+    private func startDismissMonitoring(for presentationID: UUID) {
         if globalClickMonitor == nil {
             globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 Task { @MainActor in
-                    self?.closePopover()
+                    self?.closePopover(presentationID: presentationID)
                 }
             }
         }
@@ -234,7 +287,7 @@ final class StatusItemController: NSObject {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.closePopover()
+                    self?.closePopover(presentationID: presentationID)
                 }
             }
         }
@@ -357,6 +410,62 @@ final class StatusItemController: NSObject {
         configWindowController = controller
         controller.showWindow(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+}
+
+private struct StatusItemVisualState: Equatable {
+    let pills: [MenuBarPill]
+    let brandColors: [AgentKind: RGBColor]
+}
+
+/// Receives menu-bar clicks without putting NSStatusBarButton into its native
+/// pressed/selected tracking state. The button continues to render the image
+/// beneath this transparent view.
+@MainActor
+private final class StatusItemHitView: NSView {
+    private let onClick: () -> Void
+    private var isTrackingClick = false
+
+    init(onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        isTrackingClick = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        triggerClickIfNeeded(for: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        isTrackingClick = true
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        triggerClickIfNeeded(for: event)
+    }
+
+    private func triggerClickIfNeeded(for event: NSEvent) {
+        defer { isTrackingClick = false }
+        guard isTrackingClick else {
+            return
+        }
+
+        let location = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(location) else {
+            return
+        }
+        onClick()
     }
 }
 
