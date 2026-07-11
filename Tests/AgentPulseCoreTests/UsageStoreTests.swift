@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 @Suite struct UsageStoreTests {
+    @Test func freshStoreDefaultsToAutomaticPolling() {
+        let defaults = UsageStoreFixtures.ephemeralDefaults()
+        let (store, _, _) = UsageStoreFixtures.makeStore(
+            claude: [],
+            codex: [],
+            defaults: defaults
+        )
+
+        #expect(store.refreshInterval == .defaultValue)
+    }
+
     @Test func refreshPopulatesSnapshotsAndLastUpdated() async {
         let defaults = UsageStoreFixtures.ephemeralDefaults()
         let (store, _, _) = UsageStoreFixtures.makeStore(

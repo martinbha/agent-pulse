@@ -3,9 +3,9 @@ import Testing
 @testable import AgentPulseCore
 
 @Suite struct UsagePercentFormattingTests {
-    @Test func percentTextRoundsAndSuffixes() {
+    @Test func percentTextTruncatesAndSuffixes() {
         #expect(UsageWindowFormatter.percentText(42.4) == "42%")
-        #expect(UsageWindowFormatter.percentText(42.6) == "43%")
+        #expect(UsageWindowFormatter.percentText(42.6) == "42%")
     }
 
     @Test func percentTextIsNilWhenMissing() {

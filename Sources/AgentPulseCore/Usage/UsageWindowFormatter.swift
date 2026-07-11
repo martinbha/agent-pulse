@@ -7,7 +7,7 @@ enum UsageWindowFormatter {
         guard let usedPercentage else {
             return nil
         }
-        return "\(Int(usedPercentage.rounded()))%"
+        return "\(Int(usedPercentage))%"
     }
 
     /// Progress-bar fill in 0...1, clamped. Missing usage reads as empty.

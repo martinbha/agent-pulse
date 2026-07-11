@@ -391,12 +391,13 @@ final class StatusItemController: NSObject {
         let hostingController = NSHostingController(
             rootView: AgentPulseConfigView(
                 runtime: runtime,
+                usageStore: runtime.usageStore,
                 appearance: runtime.appearance,
                 hotkeySettings: runtime.hotkeySettings
             )
         )
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 430),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

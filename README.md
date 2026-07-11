@@ -18,8 +18,8 @@ logins to fetch usage — combining them into a quiet ambient indicator.
 - **Dropdown** — click a pill for per-agent **5h** and **weekly** usage bars with
   reset times, the project and last event, a last-updated time, and a manual
   refresh button.
-- **Config** — customizable Claude and Codex brand colors, and manual test
-  events.
+- **Config** — customizable Claude and Codex brand colors, usage refresh
+  interval controls, and manual test events.
 
 Usage is fetched from your existing Claude and Codex logins with no separate
 sign-in, and Claude Desktop auth state is read-only. See

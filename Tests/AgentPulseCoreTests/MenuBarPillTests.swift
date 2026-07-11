@@ -3,9 +3,9 @@ import Testing
 @testable import AgentPulseCore
 
 @Suite struct MenuBarPillTests {
-    @Test func usageTextRoundsPercentage() {
+    @Test func usageTextTruncatesPercentage() {
         #expect(MenuBarPillBuilder.usageText(for: 42.4) == "42")
-        #expect(MenuBarPillBuilder.usageText(for: 42.6) == "43")
+        #expect(MenuBarPillBuilder.usageText(for: 42.6) == "42")
         #expect(MenuBarPillBuilder.usageText(for: 0) == "0")
         #expect(MenuBarPillBuilder.usageText(for: 100) == "100")
     }
