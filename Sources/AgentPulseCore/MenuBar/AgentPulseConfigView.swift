@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AgentPulseConfigView: View {
     @ObservedObject var runtime: AgentPulseRuntime
+    @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
     @ObservedObject var hotkeySettings: HotkeySettings
 
@@ -12,6 +13,10 @@ struct AgentPulseConfigView: View {
             Divider()
 
             SettingsSummary(runtime: runtime)
+
+            Divider()
+
+            UsageRefreshSettings(usageStore: usageStore)
 
             Divider()
 

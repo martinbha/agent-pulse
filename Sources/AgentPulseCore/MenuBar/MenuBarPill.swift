@@ -18,7 +18,7 @@ enum MenuBarPillBuilder {
         guard let usedPercentage else {
             return "--"
         }
-        return String(Int(usedPercentage.rounded()))
+        return String(Int(usedPercentage))
     }
 
     /// The pill's right-half text: 5-hour and weekly usage as "5h/weekly",

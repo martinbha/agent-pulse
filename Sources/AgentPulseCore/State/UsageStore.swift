@@ -35,8 +35,10 @@ final class UsageStore: ObservableObject {
         }
         self.snapshots = initial
 
-        let storedInterval = userDefaults.integer(forKey: refreshIntervalDefaultsKey)
-        self.refreshInterval = UsageRefreshInterval(rawValue: storedInterval) ?? .defaultValue
+        self.refreshInterval = Self.loadRefreshInterval(
+            from: userDefaults,
+            key: refreshIntervalDefaultsKey
+        )
 
         if startRefreshLoop {
             self.startRefreshLoop()
@@ -146,5 +148,16 @@ final class UsageStore: ObservableObject {
                 await self.refresh()
             }
         }
+    }
+
+    private static func loadRefreshInterval(from userDefaults: UserDefaults, key: String) -> UsageRefreshInterval {
+        guard let storedRawValue = userDefaults.object(forKey: key) as? NSNumber,
+              let interval = UsageRefreshInterval(rawValue: storedRawValue.intValue)
+        else {
+            userDefaults.set(UsageRefreshInterval.defaultValue.rawValue, forKey: key)
+            return .defaultValue
+        }
+
+        return interval
     }
 }
