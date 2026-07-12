@@ -7,6 +7,7 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let runtime: AgentPulseRuntime
     private let statusItem: NSStatusItem
+    private var statusItemView: StatusItemContentView?
     private var popoverPanel: AnchoredPopoverPanel?
     private var popoverHostingController: NSHostingController<AnyView>?
     private var configWindowController: NSWindowController?
@@ -17,7 +18,6 @@ final class StatusItemController: NSObject {
     private var globalClickMonitor: Any?
     private var appResignObserver: NSObjectProtocol?
     private var popoverPresentationID: UUID?
-    private var statusItemHitView: StatusItemHitView?
     private var isStatusItemUpdatePending = false
     private var renderedStatusItemState: StatusItemVisualState?
 
@@ -44,27 +44,17 @@ final class StatusItemController: NSObject {
     }
 
     private func configureStatusItem() {
-        guard let button = statusItem.button else {
-            return
-        }
-
-        button.title = ""
-        button.imagePosition = .imageOnly
-        button.toolTip = "Agent Pulse"
-
-        // The dropdown is a custom panel, not an NSMenu. Letting AppKit's
-        // status button track this click would briefly apply its native
-        // selected state, then clear it when mouse tracking ends. An overlay
-        // view keeps the status item visually neutral while still providing a
-        // normal click target for the custom panel.
-        let hitView = StatusItemHitView { [weak self] in
+        // The standard button owns the system's selected-state drawing. A
+        // separate custom panel cannot participate in that lifecycle, which
+        // causes a visual handoff when changing menu-bar items. Use a custom
+        // status-item view so this controller owns both the full menu-bar hit
+        // target and the pill rendering.
+        let view = StatusItemContentView { [weak self] in
             self?.togglePopover()
         }
-        hitView.frame = button.bounds
-        hitView.autoresizingMask = [.width, .height]
-        hitView.toolTip = button.toolTip
-        button.addSubview(hitView)
-        statusItemHitView = hitView
+        view.toolTip = "Agent Pulse"
+        statusItem.view = view
+        statusItemView = view
     }
 
     private func configurePopover() {
@@ -141,7 +131,7 @@ final class StatusItemController: NSObject {
     }
 
     private func updateStatusItem() {
-        guard let button = statusItem.button else {
+        guard let statusItemView else {
             return
         }
 
@@ -165,7 +155,7 @@ final class StatusItemController: NSObject {
         )
 
         if visualState != renderedStatusItemState,
-           renderPills(visualState, into: button) {
+           renderPills(visualState, into: statusItemView) {
             renderedStatusItemState = visualState
         }
 
@@ -178,14 +168,13 @@ final class StatusItemController: NSObject {
                 return "\(snapshot.agent.displayName): \(state.displayName) · 5h \(fiveHour)% · week \(weekly)%"
             }
             .joined(separator: "\n")
-        if button.toolTip != toolTip {
-            button.toolTip = toolTip
-            statusItemHitView?.toolTip = toolTip
+        if statusItemView.toolTip != toolTip {
+            statusItemView.toolTip = toolTip
         }
     }
 
     @discardableResult
-    private func renderPills(_ state: StatusItemVisualState, into button: NSStatusBarButton) -> Bool {
+    private func renderPills(_ state: StatusItemVisualState, into statusItemView: StatusItemContentView) -> Bool {
         let measuringFont = AgentPulseFont.nsFont(size: MenuBarPillsContent.fontSize, weight: .semibold)
         let widths = MenuBarPillLayout.sectionWidths(pills: state.pills) { text in
             (text as NSString).size(withAttributes: [.font: measuringFont]).width
@@ -201,16 +190,16 @@ final class StatusItemController: NSObject {
         )
 
         let renderer = ImageRenderer(content: content)
-        renderer.scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        renderer.scale = statusItemView.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
 
         guard let image = renderer.nsImage else {
             return false
         }
         image.isTemplate = false
-        button.image = image
         if statusItem.length != image.size.width {
             statusItem.length = image.size.width
         }
+        statusItemView.setImage(image, height: statusItem.statusBar?.thickness ?? NSStatusBar.system.thickness)
         return true
     }
 
@@ -348,34 +337,43 @@ final class StatusItemController: NSObject {
         return PinnedOverlayPanel(contentViewController: hostingController)
     }
 
+    private func statusItemFrameOnScreen() -> (frame: NSRect, screen: NSScreen?)? {
+        guard let statusItemView, let statusItemWindow = statusItemView.window else {
+            return nil
+        }
+
+        let frame = statusItemWindow.convertToScreen(
+            statusItemView.convert(statusItemView.bounds, to: nil)
+        )
+        return (frame, statusItemWindow.screen)
+    }
+
     private func positionPinnedPanel(_ panel: NSPanel) {
-        guard let button = statusItem.button, let buttonWindow = button.window else {
+        guard let statusItemFrame = statusItemFrameOnScreen() else {
             panel.center()
             return
         }
 
-        let buttonOnScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let size = panel.frame.size
-        let visibleFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let visibleFrame = statusItemFrame.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         let margin: CGFloat = 8
 
-        let x = min(max(buttonOnScreen.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
-        let y = min(buttonOnScreen.minY - size.height - margin, visibleFrame.maxY - size.height - margin)
+        let x = min(max(statusItemFrame.frame.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
+        let y = min(statusItemFrame.frame.minY - size.height - margin, visibleFrame.maxY - size.height - margin)
         panel.setFrameOrigin(NSPoint(x: x, y: max(y, visibleFrame.minY + margin)))
     }
 
     private func positionPopoverPanel(_ panel: NSPanel) {
-        guard let button = statusItem.button, let buttonWindow = button.window else {
+        guard let statusItemFrame = statusItemFrameOnScreen() else {
             panel.center()
             return
         }
 
-        let buttonOnScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let size = panel.frame.size
-        let visibleFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let visibleFrame = statusItemFrame.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         let margin: CGFloat = 8
-        let x = min(max(buttonOnScreen.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
-        let y = min(buttonOnScreen.minY - size.height, visibleFrame.maxY - size.height)
+        let x = min(max(statusItemFrame.frame.midX - size.width / 2, visibleFrame.minX + margin), visibleFrame.maxX - size.width - margin)
+        let y = min(statusItemFrame.frame.minY - size.height, visibleFrame.maxY - size.height)
         panel.setFrameOrigin(NSPoint(x: x, y: max(y, visibleFrame.minY + margin)))
     }
 
@@ -418,12 +416,13 @@ private struct StatusItemVisualState: Equatable {
     let brandColors: [AgentKind: RGBColor]
 }
 
-/// Receives menu-bar clicks without putting NSStatusBarButton into its native
-/// pressed/selected tracking state. The button continues to render the image
-/// beneath this transparent view.
+/// Owns the complete status-item slot rather than overlaying the system button.
+/// This is deliberately a custom view so the native button cannot draw a
+/// selected state while the separately managed dropdown is visible.
 @MainActor
-private final class StatusItemHitView: NSView {
+private final class StatusItemContentView: NSView {
     private let onClick: () -> Void
+    private var image: NSImage?
     private var isTrackingClick = false
 
     init(onClick: @escaping () -> Void) {
@@ -435,8 +434,50 @@ private final class StatusItemHitView: NSView {
         nil
     }
 
+    override var intrinsicContentSize: NSSize {
+        guard let image else {
+            return NSSize(width: 1, height: NSStatusBar.system.thickness)
+        }
+        return NSSize(width: image.size.width, height: NSStatusBar.system.thickness)
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        true
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        .button
+    }
+
+    override func accessibilityLabel() -> String? {
+        "Agent Pulse"
+    }
+
+    func setImage(_ image: NSImage, height: CGFloat) {
+        self.image = image
+        setFrameSize(NSSize(width: image.size.width, height: height))
+        invalidateIntrinsicContentSize()
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        guard let image else {
+            return
+        }
+
+        let imageRect = NSRect(
+            x: 0,
+            y: floor((bounds.height - image.size.height) / 2),
+            width: image.size.width,
+            height: image.size.height
+        )
+        image.draw(in: imageRect)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -453,6 +494,11 @@ private final class StatusItemHitView: NSView {
 
     override func rightMouseUp(with event: NSEvent) {
         triggerClickIfNeeded(for: event)
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        onClick()
+        return true
     }
 
     private func triggerClickIfNeeded(for event: NSEvent) {
