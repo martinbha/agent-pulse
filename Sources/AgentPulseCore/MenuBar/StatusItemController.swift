@@ -16,6 +16,7 @@ final class StatusItemController: NSObject {
     private var hotKey: GlobalHotKey?
     private var cancellables: Set<AnyCancellable> = []
     private var globalClickMonitor: Any?
+    private var statusItemClickMonitor: Any?
     private var appResignObserver: NSObjectProtocol?
     private var popoverPresentationID: UUID?
     private var isStatusItemUpdatePending = false
@@ -38,23 +39,47 @@ final class StatusItemController: NSObject {
         if let globalClickMonitor {
             NSEvent.removeMonitor(globalClickMonitor)
         }
+        if let statusItemClickMonitor {
+            NSEvent.removeMonitor(statusItemClickMonitor)
+        }
         if let appResignObserver {
             NotificationCenter.default.removeObserver(appResignObserver)
         }
     }
 
     private func configureStatusItem() {
-        // The standard button owns the system's selected-state drawing. A
-        // separate custom panel cannot participate in that lifecycle, which
-        // causes a visual handoff when changing menu-bar items. Use a custom
-        // status-item view so this controller owns both the full menu-bar hit
-        // target and the pill rendering.
+        // The standard button participates in the system's menu-bar tracking,
+        // which draws a selection hand-off flash when the pointer moves
+        // between menu-bar apps; the button cell's highlight mask does not
+        // govern that drawing. Use a custom status-item view so no native
+        // button exists to be highlighted.
         let view = StatusItemContentView { [weak self] in
             self?.togglePopover()
         }
         view.toolTip = "Agent Pulse"
         statusItem.view = view
         statusItemView = view
+
+        // AppKit routes clicks on the status window's padding — including the
+        // band between the icon and the top screen edge — to its private
+        // container view, never to a custom status-item view. The status
+        // window belongs to this process, so a local monitor sees those
+        // clicks before dispatch and can treat the whole window as the hit
+        // target. Cmd-modified clicks pass through untouched to preserve the
+        // system's drag-to-reorder handling.
+        statusItemClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] event in
+            guard let self,
+                  let window = self.statusItemView?.window,
+                  event.window === window,
+                  !event.modifierFlags.contains(.command)
+            else {
+                return event
+            }
+            self.togglePopover()
+            return nil
+        }
     }
 
     private func configurePopover() {
@@ -416,14 +441,15 @@ private struct StatusItemVisualState: Equatable {
     let brandColors: [AgentKind: RGBColor]
 }
 
-/// Owns the complete status-item slot rather than overlaying the system button.
-/// This is deliberately a custom view so the native button cannot draw a
-/// selected state while the separately managed dropdown is visible.
+/// Owns the complete status-item slot rather than overlaying the system button,
+/// so no native button exists to draw menu-bar tracking highlights. Mouse
+/// clicks are handled by the controller's local event monitor, which covers
+/// the parts of the status window AppKit never routes to a custom view; this
+/// view only renders the pills and answers accessibility.
 @MainActor
 private final class StatusItemContentView: NSView {
     private let onClick: () -> Void
     private var image: NSImage?
-    private var isTrackingClick = false
 
     init(onClick: @escaping () -> Void) {
         self.onClick = onClick
@@ -439,10 +465,6 @@ private final class StatusItemContentView: NSView {
             return NSSize(width: 1, height: NSStatusBar.system.thickness)
         }
         return NSSize(width: image.size.width, height: NSStatusBar.system.thickness)
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        true
     }
 
     override func isAccessibilityElement() -> Bool {
@@ -480,38 +502,9 @@ private final class StatusItemContentView: NSView {
         image.draw(in: imageRect)
     }
 
-    override func mouseDown(with event: NSEvent) {
-        isTrackingClick = true
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        triggerClickIfNeeded(for: event)
-    }
-
-    override func rightMouseDown(with event: NSEvent) {
-        isTrackingClick = true
-    }
-
-    override func rightMouseUp(with event: NSEvent) {
-        triggerClickIfNeeded(for: event)
-    }
-
     override func accessibilityPerformPress() -> Bool {
         onClick()
         return true
-    }
-
-    private func triggerClickIfNeeded(for event: NSEvent) {
-        defer { isTrackingClick = false }
-        guard isTrackingClick else {
-            return
-        }
-
-        let location = convert(event.locationInWindow, from: nil)
-        guard bounds.contains(location) else {
-            return
-        }
-        onClick()
     }
 }
 
