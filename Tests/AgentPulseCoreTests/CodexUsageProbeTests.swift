@@ -47,6 +47,7 @@ import Testing
 
         #expect(window.used == 41.5)
         #expect(window.resetEpoch == 1_767_225_600)
+        #expect(window.durationMinutes == 300)
     }
 
     @Test func windowWithoutUsedPercentIsRejected() {
@@ -68,5 +69,19 @@ import Testing
         #expect(values[2] == 43.5)
         #expect(values[3] == nil)
         #expect(values[4] == nil)
+    }
+
+    @Test func mapsSingleWeeklyPrimaryWindowToWeek() {
+        let windows = CodexUsageFixtures.durationMappedWindows()
+
+        #expect(windows.fiveHour == nil)
+        #expect(windows.weekly == 3)
+    }
+
+    @Test func preservesLegacyOrderWhenDurationsAreAbsent() {
+        let windows = CodexUsageFixtures.legacyMappedWindows()
+
+        #expect(windows.fiveHour == 12)
+        #expect(windows.weekly == 34)
     }
 }

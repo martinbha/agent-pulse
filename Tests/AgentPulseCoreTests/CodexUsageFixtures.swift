@@ -96,12 +96,13 @@ enum CodexUsageFixtures {
 
     // MARK: - Window parsing
 
-    static func parsedFullWindow() -> (used: Double?, resetEpoch: Double?) {
+    static func parsedFullWindow() -> (used: Double?, resetEpoch: Double?, durationMinutes: Double?) {
         let window = CodexUsageProbe().parseWindow([
             "usedPercent": 41.5,
             "resetsAt": 1_767_225_600,
+            "windowDurationMins": 300,
         ])
-        return (window?.usedPercent, window?.resetsAt?.timeIntervalSince1970)
+        return (window?.usedPercent, window?.resetsAt?.timeIntervalSince1970, window?.durationMinutes)
     }
 
     static func windowWithoutUsedPercentIsNil() -> Bool {
@@ -125,6 +126,24 @@ enum CodexUsageFixtures {
             probe.numericValue("not-a-number"),
             probe.numericValue(nil),
         ]
+    }
+
+    static func durationMappedWindows() -> (fiveHour: Double?, weekly: Double?) {
+        let weeklyOnly = CodexRateLimits(
+            primary: CodexRateLimitWindow(usedPercent: 3, resetsAt: nil, durationMinutes: 10_080),
+            secondary: nil,
+            planType: "plus"
+        )
+        return (weeklyOnly.fiveHour?.usedPercent, weeklyOnly.weekly?.usedPercent)
+    }
+
+    static func legacyMappedWindows() -> (fiveHour: Double?, weekly: Double?) {
+        let legacy = CodexRateLimits(
+            primary: CodexRateLimitWindow(usedPercent: 12, resetsAt: nil, durationMinutes: nil),
+            secondary: CodexRateLimitWindow(usedPercent: 34, resetsAt: nil, durationMinutes: nil),
+            planType: "plus"
+        )
+        return (legacy.fiveHour?.usedPercent, legacy.weekly?.usedPercent)
     }
 
     // MARK: - Helpers

@@ -13,15 +13,15 @@ struct CodexUsageProbe: Sendable {
                 agent: .codex,
                 fiveHour: UsageWindow(
                     kind: .fiveHour,
-                    usedPercentage: limits.primary?.usedPercent,
-                    resetsAt: limits.primary?.resetsAt,
-                    message: limits.primary == nil ? "No 5h limit returned." : nil
+                    usedPercentage: limits.fiveHour?.usedPercent,
+                    resetsAt: limits.fiveHour?.resetsAt,
+                    message: limits.fiveHour == nil ? "No 5h limit returned." : nil
                 ),
                 weekly: UsageWindow(
                     kind: .weekly,
-                    usedPercentage: limits.secondary?.usedPercent,
-                    resetsAt: limits.secondary?.resetsAt,
-                    message: limits.secondary == nil ? "No weekly limit returned." : nil
+                    usedPercentage: limits.weekly?.usedPercent,
+                    resetsAt: limits.weekly?.resetsAt,
+                    message: limits.weekly == nil ? "No weekly limit returned." : nil
                 ),
                 detail: limits.planType.map { "Plan: \($0)" }
             )
@@ -117,7 +117,11 @@ struct CodexUsageProbe: Sendable {
             return nil
         }
         let resetsAt = numericValue(window["resetsAt"]).map(Date.init(timeIntervalSince1970:))
-        return CodexRateLimitWindow(usedPercent: usedPercent, resetsAt: resetsAt)
+        return CodexRateLimitWindow(
+            usedPercent: usedPercent,
+            resetsAt: resetsAt,
+            durationMinutes: numericValue(window["windowDurationMins"])
+        )
     }
 
     func numericValue(_ value: Any?) -> Double? {
@@ -159,11 +163,35 @@ struct CodexRateLimits {
     let primary: CodexRateLimitWindow?
     let secondary: CodexRateLimitWindow?
     let planType: String?
+
+    /// The app-server's `primary` and `secondary` labels are not fixed to a
+    /// particular duration. Recent Codex versions return a weekly window as
+    /// `primary` and omit `secondary`, so select windows by their duration.
+    /// Older responses without duration metadata retain the original ordering.
+    var fiveHour: CodexRateLimitWindow? {
+        window(withDurationMinutes: 5 * 60, legacy: primary)
+    }
+
+    var weekly: CodexRateLimitWindow? {
+        window(withDurationMinutes: 7 * 24 * 60, legacy: secondary)
+    }
+
+    private func window(
+        withDurationMinutes durationMinutes: Double,
+        legacy: CodexRateLimitWindow?
+    ) -> CodexRateLimitWindow? {
+        let windows = [primary, secondary]
+        guard windows.contains(where: { $0?.durationMinutes != nil }) else {
+            return legacy
+        }
+        return windows.first { $0?.durationMinutes == durationMinutes } ?? nil
+    }
 }
 
 struct CodexRateLimitWindow: Sendable, Equatable {
     let usedPercent: Double
     let resetsAt: Date?
+    let durationMinutes: Double?
 }
 
 func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
