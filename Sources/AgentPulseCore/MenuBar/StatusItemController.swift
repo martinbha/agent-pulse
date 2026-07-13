@@ -65,10 +65,11 @@ final class StatusItemController: NSObject {
         // container view, never to a custom status-item view. The status
         // window belongs to this process, so a local monitor sees those
         // clicks before dispatch and can treat the whole window as the hit
-        // target. Cmd-modified clicks pass through untouched to preserve the
-        // system's drag-to-reorder handling.
+        // target. Both halves of handled clicks are consumed so AppKit's
+        // private container never sees a partial gesture. Cmd-modified clicks
+        // pass through untouched to preserve drag-to-reorder handling.
         statusItemClickMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown]
+            matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp]
         ) { [weak self] event in
             guard let self,
                   let window = self.statusItemView?.window,
@@ -77,7 +78,10 @@ final class StatusItemController: NSObject {
             else {
                 return event
             }
-            self.togglePopover()
+
+            if event.type == .leftMouseDown || event.type == .rightMouseDown {
+                self.togglePopover()
+            }
             return nil
         }
     }
