@@ -2,8 +2,6 @@ import AppKit
 import Foundation
 import UserNotifications
 
-private let hostBundleIDUserInfoKey = "hostBundleID"
-
 @MainActor
 final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate {
     private let center: UNUserNotificationCenter
@@ -51,7 +49,10 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
 
         let userInfo = response.notification.request.content.userInfo
-        guard let hostBundleID = userInfo[hostBundleIDUserInfoKey] as? String, !hostBundleID.isEmpty else {
+        guard
+            let hostBundleID = userInfo[NotifierCommand.hostBundleIDUserInfoKey] as? String,
+            !hostBundleID.isEmpty
+        else {
             return
         }
 
@@ -70,43 +71,65 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
     }
 
-    /// The system moves the attached file into its own store, so each
-    /// notification gets a fresh temp copy of the logo.
-    private func makeLogoAttachment(for agent: AgentKind) -> UNNotificationAttachment? {
-        guard let data = AgentPulseImages.notificationLogoPNG(for: agent) else {
-            return nil
+    private func notify(agent: AgentKind, action: String, snapshot: AgentStatusSnapshot) {
+        let verb = verbProvider.randomVerb()
+        let command = NotifierCommand(
+            title: "\(agent.notificationName) \(action) \(verb)",
+            body: [snapshot.project, snapshot.event]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " · "),
+            hostBundleID: snapshot.hostBundleID
+        )
+
+        if launchNotifierHelper(for: agent, command: command) {
+            return
         }
 
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("agent-pulse-notification-logos", isDirectory: true)
-        let fileURL = directory.appendingPathComponent("\(agent.rawValue)-\(UUID().uuidString).png")
+        postDirectly(command, agent: agent)
+    }
+
+    /// Notifications go out through the agent's bundled helper app so the
+    /// banner carries that agent's logo as its sender icon.
+    private func launchNotifierHelper(for agent: AgentKind, command: NotifierCommand) -> Bool {
+        guard let executableURL = Self.notifierExecutableURL(for: agent) else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = command.argumentList()
 
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try data.write(to: fileURL)
-            return try UNNotificationAttachment(identifier: "agent-logo", url: fileURL)
+            try process.run()
+            return true
         } catch {
-            NSLog("Agent Pulse notification logo attachment failed: %{public}@", error.localizedDescription)
-            return nil
+            NSLog("Agent Pulse could not launch notifier helper: %{public}@", error.localizedDescription)
+            return false
         }
     }
 
-    private func notify(agent: AgentKind, action: String, snapshot: AgentStatusSnapshot) {
-        let verb = verbProvider.randomVerb()
+    private static func notifierExecutableURL(for agent: AgentKind) -> URL? {
+        let name = agent.notifierHelperName
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/\(name).app/Contents/MacOS/\(name)")
+
+        guard FileManager.default.isExecutableFile(atPath: url.path) else {
+            return nil
+        }
+        return url
+    }
+
+    /// Direct posting from the main app remains as the fallback when the
+    /// helper bundles are unavailable (e.g. running straight from `swift build`).
+    private func postDirectly(_ command: NotifierCommand, agent: AgentKind) {
         let content = UNMutableNotificationContent()
-        content.title = "\(agent.notificationName) \(action) \(verb)"
-        content.body = [snapshot.project, snapshot.event]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+        content.title = command.title
+        content.body = command.body
         content.sound = .default
 
-        if let hostBundleID = snapshot.hostBundleID, !hostBundleID.isEmpty {
-            content.userInfo = [hostBundleIDUserInfoKey: hostBundleID]
-        }
-
-        if let attachment = makeLogoAttachment(for: agent) {
-            content.attachments = [attachment]
+        if let hostBundleID = command.hostBundleID, !hostBundleID.isEmpty {
+            content.userInfo = [NotifierCommand.hostBundleIDUserInfoKey: hostBundleID]
         }
 
         let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
@@ -142,6 +165,15 @@ private extension AgentKind {
             return "Claude"
         case .codex:
             return "Codex"
+        }
+    }
+
+    var notifierHelperName: String {
+        switch self {
+        case .claude:
+            return "Agent Pulse Claude"
+        case .codex:
+            return "Agent Pulse Codex"
         }
     }
 }
