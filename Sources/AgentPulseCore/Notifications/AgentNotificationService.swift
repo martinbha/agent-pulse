@@ -63,7 +63,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             Task { @MainActor in
                 if let error {
-                    NSLog("Agent Pulse notification authorization failed: %{public}@", error.localizedDescription)
+                    NSLog("Agent Pulse notification authorization failed: %@", error.localizedDescription)
                 } else if !granted {
                     NSLog("Agent Pulse notifications were not granted")
                 }
@@ -104,7 +104,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             try process.run()
             return true
         } catch {
-            NSLog("Agent Pulse could not launch notifier helper: %{public}@", error.localizedDescription)
+            NSLog("Agent Pulse could not launch notifier helper: %@", error.localizedDescription)
             return false
         }
     }
@@ -142,7 +142,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         center.add(request) { [center] error in
             if let error {
                 Task { @MainActor in
-                    NSLog("Agent Pulse notification failed: %{public}@", error.localizedDescription)
+                    NSLog("Agent Pulse notification failed: %@", error.localizedDescription)
                 }
                 return
             }

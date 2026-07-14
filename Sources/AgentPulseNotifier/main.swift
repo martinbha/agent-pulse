@@ -61,7 +61,7 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
 
         center.requestAuthorization(options: [.alert, .sound]) { [center] granted, error in
             if let error {
-                NSLog("Agent Pulse notifier authorization failed: %{public}@", error.localizedDescription)
+                NSLog("Agent Pulse notifier authorization failed: %@", error.localizedDescription)
             }
             guard granted else {
                 exit(0)
@@ -83,7 +83,7 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
 
             center.add(request) { error in
                 if let error {
-                    NSLog("Agent Pulse notifier failed to post: %{public}@", error.localizedDescription)
+                    NSLog("Agent Pulse notifier failed to post: %@", error.localizedDescription)
                     exit(1)
                 }
 
