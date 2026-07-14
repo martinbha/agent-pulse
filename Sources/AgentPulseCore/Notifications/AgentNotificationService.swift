@@ -1,5 +1,8 @@
+import AppKit
 import Foundation
 import UserNotifications
+
+private let hostBundleIDUserInfoKey = "hostBundleID"
 
 @MainActor
 final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate {
@@ -37,6 +40,36 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
+            return
+        }
+
+        let userInfo = response.notification.request.content.userInfo
+        guard let hostBundleID = userInfo[hostBundleIDUserInfoKey] as? String, !hostBundleID.isEmpty else {
+            return
+        }
+
+        await Self.openHostApp(bundleID: hostBundleID)
+    }
+
+    @MainActor
+    private static func openHostApp(bundleID: String) async {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            NSLog("Agent Pulse found no app for bundle id %{public}@", bundleID)
+            return
+        }
+
+        do {
+            try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        } catch {
+            NSLog("Agent Pulse could not open %{public}@: %{public}@", bundleID, error.localizedDescription)
+        }
     }
 
     private func requestAuthorization() {
@@ -81,6 +114,10 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
         content.sound = .default
+
+        if let hostBundleID = snapshot.hostBundleID, !hostBundleID.isEmpty {
+            content.userInfo = [hostBundleIDUserInfoKey: hostBundleID]
+        }
 
         if let attachment = makeLogoAttachment(for: agent) {
             content.attachments = [attachment]
