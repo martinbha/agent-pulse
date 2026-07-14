@@ -15,6 +15,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         super.init()
 
         center.delegate = self
+        center.removeAllDeliveredNotifications()
         requestAuthorization()
     }
 
@@ -35,7 +36,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        [.banner, .sound]
     }
 
     private func requestAuthorization() {
@@ -60,17 +61,27 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             .joined(separator: " · ")
         content.sound = .default
 
+        let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
         let request = UNNotificationRequest(
-            identifier: "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)",
+            identifier: identifier,
             content: content,
             trigger: nil
         )
 
-        center.add(request) { error in
+        center.add(request) { [center] error in
             if let error {
                 Task { @MainActor in
                     NSLog("Agent Pulse notification failed: %{public}@", error.localizedDescription)
                 }
+                return
+            }
+
+            // macOS banners stay on screen for roughly 5 seconds; removing the
+            // delivered notification after that keeps it out of Notification Center
+            // without cutting the banner short.
+            Task {
+                try? await Task.sleep(for: .seconds(8))
+                center.removeDeliveredNotifications(withIdentifiers: [identifier])
             }
         }
     }
