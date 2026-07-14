@@ -51,6 +51,27 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
     }
 
+    /// The system moves the attached file into its own store, so each
+    /// notification gets a fresh temp copy of the logo.
+    private func makeLogoAttachment(for agent: AgentKind) -> UNNotificationAttachment? {
+        guard let data = AgentPulseImages.notificationLogoPNG(for: agent) else {
+            return nil
+        }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agent-pulse-notification-logos", isDirectory: true)
+        let fileURL = directory.appendingPathComponent("\(agent.rawValue)-\(UUID().uuidString).png")
+
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: fileURL)
+            return try UNNotificationAttachment(identifier: "agent-logo", url: fileURL)
+        } catch {
+            NSLog("Agent Pulse notification logo attachment failed: %{public}@", error.localizedDescription)
+            return nil
+        }
+    }
+
     private func notify(agent: AgentKind, action: String, snapshot: AgentStatusSnapshot) {
         let verb = verbProvider.randomVerb()
         let content = UNMutableNotificationContent()
@@ -60,6 +81,10 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
         content.sound = .default
+
+        if let attachment = makeLogoAttachment(for: agent) {
+            content.attachments = [attachment]
+        }
 
         let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
         let request = UNNotificationRequest(
