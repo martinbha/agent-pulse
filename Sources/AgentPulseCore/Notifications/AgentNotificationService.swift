@@ -55,21 +55,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             return
         }
 
-        await Self.openHostApp(bundleID: hostBundleID)
-    }
-
-    @MainActor
-    private static func openHostApp(bundleID: String) async {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-            NSLog("Agent Pulse found no app for bundle id %{public}@", bundleID)
-            return
-        }
-
-        do {
-            try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        } catch {
-            NSLog("Agent Pulse could not open %{public}@: %{public}@", bundleID, error.localizedDescription)
-        }
+        await HostAppOpener.open(bundleID: hostBundleID)
     }
 
     private func requestAuthorization() {
