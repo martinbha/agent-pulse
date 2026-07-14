@@ -64,6 +64,9 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
                 NSLog("Agent Pulse notifier authorization failed: %@", error.localizedDescription)
             }
             guard granted else {
+                if error == nil {
+                    NSLog("Agent Pulse notifier notifications were not granted")
+                }
                 exit(0)
             }
 
