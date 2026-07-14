@@ -10,7 +10,8 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "agent-pulse", targets: ["AgentPulse"])
+        .executable(name: "agent-pulse", targets: ["AgentPulse"]),
+        .executable(name: "agent-pulse-notifier", targets: ["AgentPulseNotifier"])
     ],
     targets: [
         .target(
@@ -23,6 +24,12 @@ let package = Package(
             name: "AgentPulse",
             dependencies: ["AgentPulseCore"],
             path: "Sources/AgentPulse",
+            swiftSettings: swift5Mode
+        ),
+        .executableTarget(
+            name: "AgentPulseNotifier",
+            dependencies: ["AgentPulseCore"],
+            path: "Sources/AgentPulseNotifier",
             swiftSettings: swift5Mode
         ),
         .testTarget(
