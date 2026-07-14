@@ -9,6 +9,7 @@ struct AgentEvent: Codable, Equatable, Sendable {
     var project: String?
     var timestamp: Date?
     var source: String?
+    var hostBundleID: String?
 
     enum CodingKeys: String, CodingKey {
         case agent
@@ -19,6 +20,7 @@ struct AgentEvent: Codable, Equatable, Sendable {
         case project
         case timestamp
         case source
+        case hostBundleID = "host_bundle_id"
     }
 
     var resolvedProject: String? {
