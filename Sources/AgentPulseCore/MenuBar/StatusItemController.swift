@@ -87,7 +87,7 @@ final class StatusItemController: NSObject {
     }
 
     private func configurePopover() {
-        let rootView = AnyView(DropdownPopoverSurface(content: makeDropdownView()))
+        let rootView = AnyView(DropdownPopoverSurface(content: makePopoverDropdownView()))
         let hostingController = NSHostingController(rootView: rootView)
         // We size the surfaces explicitly before showing them; automatic
         // preferred-size updates would resize the window *after* it has been
@@ -97,15 +97,17 @@ final class StatusItemController: NSObject {
         popoverPanel = AnchoredPopoverPanel(contentViewController: hostingController)
     }
 
-    private func makeDropdownView() -> AgentStatusPanel {
+    private func makeDropdownView(dismiss: @escaping () -> Void) -> AgentStatusPanel {
         AgentStatusPanel(
             runtime: runtime,
             store: runtime.store,
             usageStore: runtime.usageStore,
             appearance: runtime.appearance,
+            appLauncher: runtime.appLauncher,
             openConfig: { [weak self] in
                 self?.showConfigWindow()
-            }
+            },
+            dismiss: dismiss
         )
     }
 
@@ -252,8 +254,14 @@ final class StatusItemController: NSObject {
         startDismissMonitoring(for: presentationID)
     }
 
+    private func makePopoverDropdownView() -> AgentStatusPanel {
+        makeDropdownView(dismiss: { [weak self] in
+            self?.closePopover()
+        })
+    }
+
     private func makePopoverPanel() -> AnchoredPopoverPanel {
-        let rootView = AnyView(DropdownPopoverSurface(content: makeDropdownView()))
+        let rootView = AnyView(DropdownPopoverSurface(content: makePopoverDropdownView()))
         let hostingController = NSHostingController(rootView: rootView)
         hostingController.sizingOptions = []
         popoverHostingController = hostingController
@@ -352,8 +360,10 @@ final class StatusItemController: NSObject {
         // The overlay stays above other apps (hidesOnDeactivate = false), so it
         // needs rounded corners (unlike the popover, which supplies its own
         // chrome). Its content provides the shared opaque background.
+        // The pinned overlay stays up when a row opens an agent app; only the
+        // click-through popover dismisses itself.
         let rootView = AnyView(
-            makeDropdownView()
+            makeDropdownView(dismiss: {})
                 .background(DropdownBackground())
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         )

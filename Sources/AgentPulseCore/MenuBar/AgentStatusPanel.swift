@@ -6,7 +6,9 @@ struct AgentStatusPanel: View {
     @ObservedObject var store: AgentStatusStore
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
+    @ObservedObject var appLauncher: AgentAppLauncher
     var openConfig: () -> Void
+    var dismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -25,7 +27,11 @@ struct AgentStatusPanel: View {
                         usage: usageStore.snapshot(for: snapshot.agent),
                         availability: usageStore.status(for: snapshot.agent).availability,
                         accent: appearance.color(for: snapshot.agent),
-                        now: store.now
+                        now: store.now,
+                        isAppUnavailable: appLauncher.unavailableAgents.contains(snapshot.agent),
+                        openApp: {
+                            openAgentApp(snapshot.agent)
+                        }
                     )
                 }
             }
@@ -52,6 +58,14 @@ struct AgentStatusPanel: View {
         .padding(16)
         .frame(width: 360)
         .agentPulseFont(size: 13)
+    }
+
+    private func openAgentApp(_ agent: AgentKind) {
+        Task {
+            if await appLauncher.open(agent) {
+                dismiss()
+            }
+        }
     }
 
     private var header: some View {

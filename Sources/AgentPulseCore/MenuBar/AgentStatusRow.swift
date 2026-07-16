@@ -7,11 +7,40 @@ struct AgentStatusRow: View {
     var availability: UsageAvailability
     var accent: Color
     var now: Date
+    var isAppUnavailable: Bool = false
+    var openApp: () -> Void = {}
+
+    @State private var isHovered = false
 
     private let dotSize: CGFloat = 12
     private let detailIndent: CGFloat = 22
+    private let hoverInset: CGFloat = 8
 
     var body: some View {
+        Button(action: openApp) {
+            rowContent
+                .padding(hoverInset)
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.06 : 0))
+                )
+                // Track hover here, on the padded content, so the hover region
+                // is exactly the highlighted rectangle; outside the negative
+                // padding it would be inset by hoverInset on every edge.
+                .onHover { hovering in
+                    isHovered = hovering
+                }
+        }
+        .buttonStyle(.plain)
+        // Cancel the hit-target padding so the row occupies the same footprint
+        // as before it became a button.
+        .padding(-hoverInset)
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .help("Open \(snapshot.agent.displayName)")
+    }
+
+    private var rowContent: some View {
         VStack(alignment: .leading, spacing: 5) {
             // Baseline-aligned so the dot tracks the title text itself; the
             // display font's uneven line box makes plain center alignment sit
@@ -26,10 +55,18 @@ struct AgentStatusRow: View {
                 Text(snapshot.agent.displayName)
                     .agentPulseFont(size: 15)
                 Spacer()
-                Text(effectiveState.displayName)
-                    .agentPulseFont(size: 11)
-                    .foregroundStyle(effectiveState.color)
+                if isAppUnavailable {
+                    Text("App not found")
+                        .agentPulseFont(size: 11)
+                        .foregroundStyle(.orange)
+                        .transition(.opacity)
+                } else {
+                    Text(effectiveState.displayName)
+                        .agentPulseFont(size: 11)
+                        .foregroundStyle(effectiveState.color)
+                }
             }
+            .animation(.easeOut(duration: 0.15), value: isAppUnavailable)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
