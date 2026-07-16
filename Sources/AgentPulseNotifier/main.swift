@@ -42,10 +42,9 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
         didReceive response: UNNotificationResponse
     ) async {
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-           let hostBundleID = response.notification.request.content.userInfo[
-               NotifierCommand.hostBundleIDUserInfoKey
-           ] as? String,
-           !hostBundleID.isEmpty {
+           let hostBundleID = NotifierCommand.hostBundleID(
+               from: response.notification.request.content.userInfo
+           ) {
             await HostAppOpener.open(bundleID: hostBundleID)
         }
 
@@ -70,17 +69,9 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
                 exit(0)
             }
 
-            let content = UNMutableNotificationContent()
-            content.title = command.title
-            content.body = command.body
-            content.sound = .default
-            if let hostBundleID = command.hostBundleID, !hostBundleID.isEmpty {
-                content.userInfo = [NotifierCommand.hostBundleIDUserInfoKey: hostBundleID]
-            }
-
             let request = UNNotificationRequest(
                 identifier: "agent-pulse-\(UUID().uuidString)",
-                content: content,
+                content: command.makeNotificationContent(),
                 trigger: nil
             )
 
@@ -90,14 +81,15 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
                     exit(1)
                 }
 
-                // Banners hide after ~5 seconds; removing the delivered
-                // notification afterwards keeps Notification Center empty
-                // without cutting the banner short.
-                DispatchQueue.global().asyncAfter(deadline: .now() + 8) {
+                let queue = DispatchQueue.global()
+                queue.asyncAfter(deadline: .now() + NotificationTiming.bannerDismissalDelay) {
                     center.removeDeliveredNotifications(withIdentifiers: [request.identifier])
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
-                        exit(0)
-                    }
+                }
+                queue.asyncAfter(
+                    deadline: .now() + NotificationTiming.bannerDismissalDelay
+                        + NotificationTiming.posterExitGrace
+                ) {
+                    exit(0)
                 }
             }
         }
@@ -108,7 +100,7 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
     private func removeStaleDeliveredNotifications() {
         center.getDeliveredNotifications { [center] delivered in
             let stale = delivered
-                .filter { $0.date < Date(timeIntervalSinceNow: -15) }
+                .filter { $0.date < Date(timeIntervalSinceNow: -NotificationTiming.staleSweepAge) }
                 .map(\.request.identifier)
             if !stale.isEmpty {
                 center.removeDeliveredNotifications(withIdentifiers: stale)

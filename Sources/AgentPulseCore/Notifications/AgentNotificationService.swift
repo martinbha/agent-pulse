@@ -49,10 +49,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
 
         let userInfo = response.notification.request.content.userInfo
-        guard
-            let hostBundleID = userInfo[NotifierCommand.hostBundleIDUserInfoKey] as? String,
-            !hostBundleID.isEmpty
-        else {
+        guard let hostBundleID = NotifierCommand.hostBundleID(from: userInfo) else {
             return
         }
 
@@ -123,19 +120,10 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
     /// Direct posting from the main app remains as the fallback when the
     /// helper bundles are unavailable (e.g. running straight from `swift build`).
     private func postDirectly(_ command: NotifierCommand, agent: AgentKind) {
-        let content = UNMutableNotificationContent()
-        content.title = command.title
-        content.body = command.body
-        content.sound = .default
-
-        if let hostBundleID = command.hostBundleID, !hostBundleID.isEmpty {
-            content.userInfo = [NotifierCommand.hostBundleIDUserInfoKey: hostBundleID]
-        }
-
         let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
         let request = UNNotificationRequest(
             identifier: identifier,
-            content: content,
+            content: command.makeNotificationContent(),
             trigger: nil
         )
 
@@ -147,11 +135,8 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
                 return
             }
 
-            // macOS banners stay on screen for roughly 5 seconds; removing the
-            // delivered notification after that keeps it out of Notification Center
-            // without cutting the banner short.
             Task {
-                try? await Task.sleep(for: .seconds(8))
+                try? await Task.sleep(for: .seconds(NotificationTiming.bannerDismissalDelay))
                 center.removeDeliveredNotifications(withIdentifiers: [identifier])
             }
         }
@@ -168,6 +153,9 @@ private extension AgentKind {
         }
     }
 
+    /// Must stay in sync with the helper bundles assembled by
+    /// scripts/build-app-bundle; a mismatch silently degrades to the
+    /// direct-posting fallback.
     var notifierHelperName: String {
         switch self {
         case .claude:

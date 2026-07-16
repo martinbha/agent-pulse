@@ -1,3 +1,5 @@
+import UserNotifications
+
 /// Payload the main app hands to a notifier helper via argv, and the helper
 /// parses back on launch. A launch without a parseable command means the
 /// system started the helper for a notification interaction instead.
@@ -11,15 +13,39 @@ public struct NotifierCommand: Equatable, Sendable {
     public init(title: String, body: String, hostBundleID: String? = nil) {
         self.title = title
         self.body = body
-        self.hostBundleID = hostBundleID
+        // Normalized here so every consumer can treat presence as usable.
+        self.hostBundleID = hostBundleID.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     public func argumentList() -> [String] {
         var arguments = ["--title", title, "--body", body]
-        if let hostBundleID, !hostBundleID.isEmpty {
+        if let hostBundleID {
             arguments += ["--host-bundle-id", hostBundleID]
         }
         return arguments
+    }
+
+    /// Single source of the notification payload for both the notifier
+    /// helpers and the main app's direct-posting fallback.
+    public func makeNotificationContent() -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        if let hostBundleID {
+            content.userInfo = [Self.hostBundleIDUserInfoKey: hostBundleID]
+        }
+        return content
+    }
+
+    public static func hostBundleID(from userInfo: [AnyHashable: Any]) -> String? {
+        guard
+            let value = userInfo[hostBundleIDUserInfoKey] as? String,
+            !value.isEmpty
+        else {
+            return nil
+        }
+        return value
     }
 
     public static func parse(_ arguments: [String]) -> NotifierCommand? {
