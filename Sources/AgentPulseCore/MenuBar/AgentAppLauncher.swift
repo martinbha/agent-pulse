@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// Opens each agent's desktop app from the dropdown and tracks transient
 /// "app not found" feedback for rows whose app could not be opened.
@@ -6,28 +6,23 @@ import AppKit
 final class AgentAppLauncher: ObservableObject {
     @Published private(set) var unavailableAgents: Set<AgentKind> = []
 
-    private let resolveAppURL: (String) -> URL?
     private let openApp: (String) async -> Bool
     private let feedbackDuration: Duration
     private var feedbackTasks: [AgentKind: Task<Void, Never>] = [:]
 
     init(
-        resolveAppURL: @escaping (String) -> URL? = { bundleID in
-            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        },
         openApp: @escaping (String) async -> Bool = { bundleID in
             await HostAppOpener.open(bundleID: bundleID)
         },
         feedbackDuration: Duration = .milliseconds(2500)
     ) {
-        self.resolveAppURL = resolveAppURL
         self.openApp = openApp
         self.feedbackDuration = feedbackDuration
     }
 
     /// Bundle IDs to try for an agent's desktop app, in priority order. The
-    /// OpenAI desktop app has shipped under both identifiers, so the first
-    /// installed candidate wins.
+    /// OpenAI desktop app has shipped under both identifiers, so candidates
+    /// are tried until one opens.
     static func bundleIDCandidates(for agent: AgentKind) -> [String] {
         switch agent {
         case .claude:
@@ -39,12 +34,10 @@ final class AgentAppLauncher: ObservableObject {
 
     @discardableResult
     func open(_ agent: AgentKind) async -> Bool {
-        let installedBundleID = Self.bundleIDCandidates(for: agent).first { candidate in
-            resolveAppURL(candidate) != nil
-        }
-
-        if let installedBundleID, await openApp(installedBundleID) {
-            return true
+        for candidate in Self.bundleIDCandidates(for: agent) {
+            if await openApp(candidate) {
+                return true
+            }
         }
 
         markUnavailable(agent)
