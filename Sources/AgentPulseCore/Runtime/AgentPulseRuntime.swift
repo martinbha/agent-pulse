@@ -7,6 +7,7 @@ final class AgentPulseRuntime: ObservableObject {
     let settings: AgentPulseSettings
     let appearance: AppearanceSettings
     let hotkeySettings: HotkeySettings
+    let appLauncher = AgentAppLauncher()
 
     @Published private(set) var serverStatus = "Starting local server..."
 
