@@ -22,6 +22,10 @@ import Testing
         #expect(!command.argumentList().contains("--host-bundle-id"))
     }
 
+    @Test func normalizesEmptyHostBundleIDToNil() {
+        #expect(NotifierCommand(title: "Title", body: "Body", hostBundleID: "").hostBundleID == nil)
+    }
+
     @Test func parseRequiresTitle() {
         #expect(NotifierCommand.parse(["--body", "Body"]) == nil)
     }

@@ -51,25 +51,17 @@ enum AgentStatusStoreFixtures {
         let persistence = StatePersistence(fileURL: url)
 
         let store = AgentStatusStore(persistence: persistence)
-        store.ingest(
-            AgentEvent(
-                agent: .claude,
-                state: .done,
-                event: "Stop",
-                sessionID: nil,
-                cwd: nil,
-                project: "demo",
-                timestamp: Date(),
-                source: "test",
-                hostBundleID: hostBundleID
-            )
-        )
+        store.ingest(event(state: .done, name: "Stop", hostBundleID: hostBundleID))
 
         let restored = AgentStatusStore(persistence: persistence)
         return restored.snapshots[.claude]?.hostBundleID
     }
 
-    private static func event(state: AgentState, name: String) -> AgentEvent {
+    private static func event(
+        state: AgentState,
+        name: String,
+        hostBundleID: String? = nil
+    ) -> AgentEvent {
         AgentEvent(
             agent: .claude,
             state: state,
@@ -78,7 +70,8 @@ enum AgentStatusStoreFixtures {
             cwd: nil,
             project: "demo",
             timestamp: Date(),
-            source: "test"
+            source: "test",
+            hostBundleID: hostBundleID
         )
     }
 }
