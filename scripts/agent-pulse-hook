@@ -90,6 +90,10 @@ def main():
         "project": project_name(cwd),
         "timestamp": utc_now(),
         "source": "hook",
+        # Bundle id of the GUI app whose process tree the agent runs in
+        # (Terminal, iTerm2, VS Code, ...); macOS sets this for GUI-launched
+        # processes. Missing under SSH or other non-GUI sessions.
+        "host_bundle_id": os.environ.get("__CFBundleIdentifier"),
     }
 
     port = str(os.environ.get("AGENT_PULSE_PORT") or config.get("port") or "37462")

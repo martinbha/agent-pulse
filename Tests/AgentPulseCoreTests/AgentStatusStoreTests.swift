@@ -26,6 +26,17 @@ import Testing
 }
 
 @MainActor
+@Suite struct HostBundleIDPersistenceTests {
+    @Test func roundTripsHostBundleID() {
+        #expect(AgentStatusStoreFixtures.restoredHostBundleID("com.googlecode.iterm2") == "com.googlecode.iterm2")
+    }
+
+    @Test func roundTripsMissingHostBundleID() {
+        #expect(AgentStatusStoreFixtures.restoredHostBundleID(nil) == nil)
+    }
+}
+
+@MainActor
 @Suite struct SubagentStopIngestTests {
     @Test func keepsWorkingAgentWorking() {
         #expect(AgentStatusStoreFixtures.stateAfterSubagentStop(from: .working) == .working)

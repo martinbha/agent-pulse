@@ -9,6 +9,7 @@ struct AgentStatusSnapshot: Codable, Equatable, Identifiable, Sendable {
     var project: String?
     var updatedAt: Date
     var source: String?
+    var hostBundleID: String?
 
     var id: AgentKind { agent }
 
@@ -33,7 +34,8 @@ struct AgentStatusSnapshot: Codable, Equatable, Identifiable, Sendable {
         cwd: String?,
         project: String?,
         updatedAt: Date,
-        source: String?
+        source: String?,
+        hostBundleID: String? = nil
     ) {
         self.agent = agent
         self.state = state
@@ -43,6 +45,7 @@ struct AgentStatusSnapshot: Codable, Equatable, Identifiable, Sendable {
         self.project = project
         self.updatedAt = updatedAt
         self.source = source
+        self.hostBundleID = hostBundleID
     }
 
     init(event: AgentEvent) {
@@ -54,7 +57,8 @@ struct AgentStatusSnapshot: Codable, Equatable, Identifiable, Sendable {
             cwd: event.cwd,
             project: event.resolvedProject,
             updatedAt: event.resolvedTimestamp,
-            source: event.source
+            source: event.source,
+            hostBundleID: event.hostBundleID
         )
     }
 

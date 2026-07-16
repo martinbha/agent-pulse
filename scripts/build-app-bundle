@@ -12,12 +12,14 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulseCore/Resources/agent-pulse-icon.svg"
 MENU_BAR_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulseCore/Resources/agent-pulse-menubar.svg"
 APP_ICON_NAME="AgentPulse"
-BUNDLE_VERSION="2"
+BUNDLE_VERSION="3"
 
 cd "$ROOT_DIR"
 swift build -c release
 
-BIN_PATH="$(swift build -c release --show-bin-path)/agent-pulse"
+BIN_DIR="$(swift build -c release --show-bin-path)"
+BIN_PATH="$BIN_DIR/agent-pulse"
+NOTIFIER_BIN_PATH="$BIN_DIR/agent-pulse-notifier"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -28,48 +30,49 @@ cp "$APP_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-icon.svg"
 cp "$MENU_BAR_ICON_SOURCE" "$RESOURCES_DIR/agent-pulse-menubar.svg"
 
 ICONSET_PARENT="$(mktemp -d)"
-ICONSET_DIR="$ICONSET_PARENT/$APP_ICON_NAME.iconset"
-mkdir -p "$ICONSET_DIR"
 trap 'rm -rf "$ICONSET_PARENT"' EXIT
 
-make_icon() {
-  local points="$1"
-  local scale="$2"
-  local filename="$3"
-  local pixels=$((points * scale))
+render_icns() {
+  local source="$1"
+  local output="$2"
+  local iconset_dir
+  iconset_dir="$(mktemp -d "$ICONSET_PARENT/XXXXXX")/icon.iconset"
+  mkdir -p "$iconset_dir"
 
-  sips -s format png -z "$pixels" "$pixels" "$APP_ICON_SOURCE" \
-    --out "$ICONSET_DIR/$filename" >/dev/null
+  local points
+  for points in 16 32 128 256 512; do
+    sips -s format png -z "$points" "$points" "$source" \
+      --out "$iconset_dir/icon_${points}x${points}.png" >/dev/null
+    sips -s format png -z "$((points * 2))" "$((points * 2))" "$source" \
+      --out "$iconset_dir/icon_${points}x${points}@2x.png" >/dev/null
+  done
+
+  iconutil -c icns "$iconset_dir" -o "$output"
 }
 
-make_icon 16 1 icon_16x16.png
-make_icon 16 2 icon_16x16@2x.png
-make_icon 32 1 icon_32x32.png
-make_icon 32 2 icon_32x32@2x.png
-make_icon 128 1 icon_128x128.png
-make_icon 128 2 icon_128x128@2x.png
-make_icon 256 1 icon_256x256.png
-make_icon 256 2 icon_256x256@2x.png
-make_icon 512 1 icon_512x512.png
-make_icon 512 2 icon_512x512@2x.png
+render_icns "$APP_ICON_SOURCE" "$RESOURCES_DIR/$APP_ICON_NAME.icns"
 
-iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/$APP_ICON_NAME.icns"
+write_info_plist() {
+  local output="$1"
+  local name="$2"
+  local bundle_id="$3"
+  local icon_name="$4"
 
-cat > "$CONTENTS_DIR/Info.plist" <<PLIST
+  cat > "$output" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key>
-  <string>$APP_NAME</string>
+  <string>$name</string>
   <key>CFBundleIdentifier</key>
-  <string>$BUNDLE_ID</string>
+  <string>$bundle_id</string>
   <key>CFBundleIconFile</key>
-  <string>$APP_ICON_NAME</string>
+  <string>$icon_name</string>
   <key>CFBundleName</key>
-  <string>$APP_NAME</string>
+  <string>$name</string>
   <key>CFBundleDisplayName</key>
-  <string>$APP_NAME</string>
+  <string>$name</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -85,6 +88,30 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+}
+
+# Per-agent notifier helpers: each wraps the shared notifier binary in its own
+# bundle so notifications it posts carry that agent's logo as the sender icon.
+# Helper names must stay in sync with AgentKind.notifierHelperName in
+# Sources/AgentPulseCore/Notifications/AgentNotificationService.swift.
+build_notifier_helper() {
+  local name="$1"
+  local bundle_id="$2"
+  local icon_source="$3"
+  local contents="$CONTENTS_DIR/Helpers/$name.app/Contents"
+
+  mkdir -p "$contents/MacOS" "$contents/Resources"
+  cp "$NOTIFIER_BIN_PATH" "$contents/MacOS/$name"
+  render_icns "$icon_source" "$contents/Resources/AgentIcon.icns"
+  write_info_plist "$contents/Info.plist" "$name" "$bundle_id" "AgentIcon"
+}
+
+build_notifier_helper "Agent Pulse Claude" "$BUNDLE_ID.claude" \
+  "$ROOT_DIR/Sources/AgentPulseCore/Resources/claude-logo.svg"
+build_notifier_helper "Agent Pulse Codex" "$BUNDLE_ID.codex" \
+  "$ROOT_DIR/Sources/AgentPulseCore/Resources/codex-logo.svg"
+
+write_info_plist "$CONTENTS_DIR/Info.plist" "$APP_NAME" "$BUNDLE_ID" "$APP_ICON_NAME"
 
 codesign --force --deep --sign - "$APP_DIR" >/dev/null
 

@@ -42,7 +42,26 @@ enum AgentStatusStoreFixtures {
         return store.snapshots[.claude]?.state ?? .unknown
     }
 
-    private static func event(state: AgentState, name: String) -> AgentEvent {
+    /// Ingests a done event carrying a host bundle id, rebuilds the store over
+    /// the same file, and returns the restored value.
+    @MainActor
+    static func restoredHostBundleID(_ hostBundleID: String?) -> String? {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agent-pulse-store-\(UUID().uuidString).json")
+        let persistence = StatePersistence(fileURL: url)
+
+        let store = AgentStatusStore(persistence: persistence)
+        store.ingest(event(state: .done, name: "Stop", hostBundleID: hostBundleID))
+
+        let restored = AgentStatusStore(persistence: persistence)
+        return restored.snapshots[.claude]?.hostBundleID
+    }
+
+    private static func event(
+        state: AgentState,
+        name: String,
+        hostBundleID: String? = nil
+    ) -> AgentEvent {
         AgentEvent(
             agent: .claude,
             state: state,
@@ -51,7 +70,8 @@ enum AgentStatusStoreFixtures {
             cwd: nil,
             project: "demo",
             timestamp: Date(),
-            source: "test"
+            source: "test",
+            hostBundleID: hostBundleID
         )
     }
 }
