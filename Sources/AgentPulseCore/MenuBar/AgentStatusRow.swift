@@ -25,14 +25,17 @@ struct AgentStatusRow: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color.primary.opacity(isHovered ? 0.06 : 0))
                 )
+                // Track hover here, on the padded content, so the hover region
+                // is exactly the highlighted rectangle; outside the negative
+                // padding it would be inset by hoverInset on every edge.
+                .onHover { hovering in
+                    isHovered = hovering
+                }
         }
         .buttonStyle(.plain)
         // Cancel the hit-target padding so the row occupies the same footprint
         // as before it became a button.
         .padding(-hoverInset)
-        .onHover { hovering in
-            isHovered = hovering
-        }
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .help("Open \(snapshot.agent.displayName)")
     }
