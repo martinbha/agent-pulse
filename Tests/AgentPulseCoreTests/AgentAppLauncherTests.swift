@@ -45,6 +45,18 @@ import Testing
         #expect(launcher.unavailableAgents == [.claude])
     }
 
+    @Test func successClearsUnavailableFeedbackImmediately() async {
+        var shouldOpenSucceed = false
+        let launcher = AgentAppLauncher(openApp: { _ in shouldOpenSucceed })
+
+        await launcher.open(.claude)
+        #expect(launcher.unavailableAgents == [.claude])
+
+        shouldOpenSucceed = true
+        #expect(await launcher.open(.claude))
+        #expect(launcher.unavailableAgents.isEmpty)
+    }
+
     @Test func clearsUnavailableFeedbackAfterFeedbackDuration() async throws {
         let launcher = AgentAppLauncher(
             openApp: { _ in false },

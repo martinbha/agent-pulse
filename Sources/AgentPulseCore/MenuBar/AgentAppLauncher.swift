@@ -36,12 +36,26 @@ final class AgentAppLauncher: ObservableObject {
     func open(_ agent: AgentKind) async -> Bool {
         for candidate in Self.bundleIDCandidates(for: agent) {
             if await openApp(candidate) {
+                clearUnavailable(agent)
                 return true
             }
         }
 
         markUnavailable(agent)
         return false
+    }
+
+    /// A success while "App not found" feedback is still showing (possible in
+    /// the pinned overlay, which stays open) must clear the stale feedback
+    /// immediately rather than letting the timer run out.
+    private func clearUnavailable(_ agent: AgentKind) {
+        feedbackTasks[agent]?.cancel()
+        feedbackTasks[agent] = nil
+
+        guard unavailableAgents.contains(agent) else {
+            return
+        }
+        unavailableAgents.remove(agent)
     }
 
     private func markUnavailable(_ agent: AgentKind) {
