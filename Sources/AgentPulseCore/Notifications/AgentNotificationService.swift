@@ -96,6 +96,18 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         let process = Process()
         process.executableURL = executableURL
         process.arguments = command.argumentList()
+        // Exit code 2 = no notification permission, 1 = posting failed
+        // (see AgentPulseNotifier); surface those, since a spawned helper
+        // failing is otherwise invisible to the main app.
+        process.terminationHandler = { process in
+            if process.terminationStatus != 0 {
+                NSLog(
+                    "Agent Pulse notifier helper for %@ exited with status %d",
+                    agent.rawValue,
+                    process.terminationStatus
+                )
+            }
+        }
 
         do {
             try process.run()
