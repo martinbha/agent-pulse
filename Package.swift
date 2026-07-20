@@ -15,6 +15,11 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "AgentPulseBridgeSupport",
+            path: "Sources/AgentPulseBridgeSupport",
+            swiftSettings: swift5Mode
+        ),
+        .target(
             name: "AgentPulseCore",
             path: "Sources/AgentPulseCore",
             exclude: ["Resources"],
@@ -36,6 +41,12 @@ let package = Package(
             name: "AgentPulseCoreTests",
             dependencies: ["AgentPulseCore"],
             path: "Tests/AgentPulseCoreTests",
+            swiftSettings: swift5Mode
+        ),
+        .testTarget(
+            name: "AgentPulseBridgeSupportTests",
+            dependencies: ["AgentPulseBridgeSupport"],
+            path: "Tests/AgentPulseBridgeSupportTests",
             swiftSettings: swift5Mode
         )
     ]
