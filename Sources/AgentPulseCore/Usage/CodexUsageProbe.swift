@@ -64,7 +64,7 @@ struct CodexUsageProbe: Sendable {
             "params": [
                 "clientInfo": [
                     "name": "agent-pulse",
-                    "version": "0.1.0",
+                    "version": AgentPulseVersion.current,
                 ],
             ],
         ], to: stdin.fileHandleForWriting)
