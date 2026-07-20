@@ -26,6 +26,30 @@ sign-in, and Claude Desktop auth state is read-only. See
 [docs/usage-tracking.md](docs/usage-tracking.md) for the authentication sources,
 expected Keychain prompts, and privacy details.
 
+## Install from source
+
+Agent Pulse currently supports macOS 14 and newer. Until the native hook bridge
+and Homebrew distribution are available, installation requires:
+
+- Apple Command Line Tools with Swift 6 (`xcode-select --install`)
+- Python 3 for the current hook bridge (`python3 --version`)
+- Git
+
+Clone and build the app:
+
+```bash
+git clone https://github.com/martinbha/agent-pulse.git
+cd agent-pulse
+scripts/build-app-bundle
+mkdir -p "$HOME/Applications"
+ditto "dist/Agent Pulse.app" "$HOME/Applications/Agent Pulse.app"
+open "$HOME/Applications/Agent Pulse.app"
+```
+
+This source-built bundle is signed locally rather than notarized for download.
+After starting the app once, continue with
+[work-status hook setup](docs/hook-setup.md).
+
 ## Development
 
 Build the executable:
