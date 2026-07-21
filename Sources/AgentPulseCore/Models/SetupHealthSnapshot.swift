@@ -263,17 +263,21 @@ enum SetupHealthClassifier {
             )
         }
 
+        for integration in integrations {
+            if case .invalid(let reason) = integration.hooks {
+                return blocked(
+                    action: .reviewIntegrationConfiguration(integration.agent),
+                    message: "Review the integration configuration before continuing. \(reason)"
+                )
+            }
+        }
+
         if let missingHost = integrations.first(where: { $0.host == .unavailable }) {
             return (.installHost(missingHost.agent), nil)
         }
 
         for integration in integrations {
             switch integration.hooks {
-            case .invalid(let reason):
-                return blocked(
-                    action: .reviewIntegrationConfiguration(integration.agent),
-                    message: "Review the integration configuration before continuing. \(reason)"
-                )
             case .missing:
                 return blocked(
                     action: .installIntegration(integration.agent),
@@ -284,7 +288,7 @@ enum SetupHealthClassifier {
                     action: .repairIntegration(integration.agent),
                     message: "Repair the integration configuration."
                 )
-            case .current:
+            case .current, .invalid:
                 break
             }
         }
