@@ -8,7 +8,9 @@ import Testing
         #expect(BridgeCommand.parse(["--version"]) == .version)
         #expect(BridgeCommand.parse(["--doctor"]) == .doctor)
         #expect(BridgeCommand.parse(["--unknown"]) == .none)
-        #expect(BridgeCommand.parse(["sample"]) == .hook(agent: "sample"))
+        #expect(BridgeCommand.parse(["unknown"]) == .none)
+        #expect(BridgeCommand.parse(["claude"]) == .hook(agent: "claude"))
+        #expect(BridgeCommand.parse(["codex"]) == .hook(agent: "codex"))
     }
 
     @Test func resolvesVersionFromSidecarThenBundle() {
@@ -44,6 +46,25 @@ import Testing
         #expect(
             BridgeDiagnosticMessage.describe(BridgeRequestError.rejected(401))
                 == "The local server rejected the bridge token. Run setup repair."
+        )
+    }
+
+    @Test func doctorUsesDistinctFailureExitCodes() {
+        #expect(
+            BridgeDoctorExitCode.forError(BridgeConfigurationError.unreadable("config"))
+                == BridgeDoctorExitCode.invalidConfiguration
+        )
+        #expect(
+            BridgeDiagnosticsFixtures.unavailableDoctorExitCode()
+                == BridgeDoctorExitCode.serverUnavailable
+        )
+        #expect(
+            BridgeDoctorExitCode.forError(BridgeRequestError.rejected(401))
+                == BridgeDoctorExitCode.authorizationFailure
+        )
+        #expect(
+            BridgeDoctorExitCode.forError(BridgeRequestError.rejected(500))
+                == BridgeDoctorExitCode.invalidServerResponse
         )
     }
 }

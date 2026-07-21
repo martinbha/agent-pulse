@@ -27,6 +27,32 @@ public enum BridgeDiagnosticMessage {
     }
 }
 
+public enum BridgeDoctorExitCode {
+    public static let generalFailure: Int32 = 1
+    public static let invalidConfiguration: Int32 = 2
+    public static let serverUnavailable: Int32 = 3
+    public static let authorizationFailure: Int32 = 4
+    public static let invalidServerResponse: Int32 = 5
+
+    public static func forError(_ error: Error) -> Int32 {
+        if error is BridgeConfigurationError {
+            return invalidConfiguration
+        }
+        if let requestError = error as? BridgeRequestError {
+            switch requestError {
+            case .rejected(401), .rejected(403):
+                return authorizationFailure
+            case .invalidEndpoint, .invalidResponse, .rejected:
+                return invalidServerResponse
+            }
+        }
+        if error is URLError {
+            return serverUnavailable
+        }
+        return generalFailure
+    }
+}
+
 public struct BridgeLogger: Sendable {
     public static var defaultURL: URL {
         FileManager.default.homeDirectoryForCurrentUser

@@ -28,11 +28,10 @@ expected Keychain prompts, and privacy details.
 
 ## Install from source
 
-Agent Pulse currently supports macOS 14 and newer. Until the native hook bridge
-and Homebrew distribution are available, installation requires:
+Agent Pulse currently supports macOS 14 and newer. Until in-app integration
+setup and Homebrew distribution are available, installation requires:
 
 - Apple Command Line Tools with Swift 6 (`xcode-select --install`)
-- Python 3 for the current hook bridge (`python3 --version`)
 - Git
 
 Clone and build the app:
@@ -82,6 +81,6 @@ open "dist/Agent Pulse.app"
 ## Documentation
 
 - [Work-status hooks](docs/hook-setup.md) — wire Claude Code and Codex hook
-  events to Agent Pulse via the bridge script.
+  events to Agent Pulse via the native bridge.
 - [Usage tracking](docs/usage-tracking.md) — how 5h and weekly usage are read,
   the authentication sources, Keychain prompts, and privacy.
