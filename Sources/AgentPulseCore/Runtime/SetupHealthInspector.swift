@@ -116,7 +116,7 @@ struct SetupHealthInspector {
                 }
             },
             hostProvider: { agent in
-                await hostHealth(for: agent)
+                await hostHealth(for: agent, homeDirectory: homeDirectory)
             },
             hookProvider: { agent in
                 switch agent {
@@ -245,13 +245,47 @@ struct SetupHealthInspector {
     }
 
     @MainActor
-    private static func hostHealth(for agent: AgentKind) -> IntegrationHostHealth {
+    private static func hostHealth(
+        for agent: AgentKind,
+        homeDirectory: URL
+    ) -> IntegrationHostHealth {
+        if let executable = integrationExecutable(
+            named: agent.rawValue,
+            homeDirectory: homeDirectory
+        ) {
+            return .available(location: executable)
+        }
         for bundleID in AgentAppLauncher.bundleIDCandidates(for: agent) {
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                return .available(applicationURL: url)
+                return .available(location: url)
             }
         }
         return .unavailable
+    }
+
+    private static func integrationExecutable(
+        named executable: String,
+        homeDirectory: URL
+    ) -> URL? {
+        let environmentPaths = ProcessInfo.processInfo.environment["PATH"]?
+            .split(separator: ":")
+            .map(String.init) ?? []
+        let commonPaths = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            homeDirectory.appendingPathComponent(".local/bin").path,
+            homeDirectory.appendingPathComponent("bin").path,
+        ]
+        var inspected: Set<String> = []
+        for directory in environmentPaths + commonPaths where inspected.insert(directory).inserted {
+            let candidate = URL(fileURLWithPath: directory).appendingPathComponent(executable)
+            if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
     }
 
     private static func notificationHealth(

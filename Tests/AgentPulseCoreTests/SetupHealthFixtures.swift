@@ -310,7 +310,7 @@ enum SetupHealthFixtures {
             localServerProvider: { server },
             bridgeProvider: { .current(version: "1.0.0") },
             hostProvider: { agent in
-                .available(applicationURL: URL(fileURLWithPath: "/Applications/\(agent.rawValue).app"))
+                .available(location: URL(fileURLWithPath: "/Applications/\(agent.rawValue).app"))
             },
             hookProvider: { _ in .current },
             notificationProvider: { .authorized },
@@ -343,7 +343,7 @@ enum SetupHealthFixtures {
             (
                 agent,
                 .available(
-                    applicationURL: URL(fileURLWithPath: "/Applications/\(agent.rawValue).app")
+                    location: URL(fileURLWithPath: "/Applications/\(agent.rawValue).app")
                 )
             )
         })

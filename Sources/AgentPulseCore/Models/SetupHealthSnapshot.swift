@@ -43,7 +43,7 @@ enum BridgeHealth: Equatable, Sendable {
 }
 
 enum IntegrationHostHealth: Equatable, Sendable {
-    case available(applicationURL: URL)
+    case available(location: URL)
     case unavailable
 }
 
