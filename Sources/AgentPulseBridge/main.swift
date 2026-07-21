@@ -37,8 +37,7 @@ enum AgentPulseBridgeCommand {
                 event: event,
                 configuration: configuration
             )
-            let (_, response) = try await URLSession.shared.data(for: request)
-            try BridgeResponseValidator.validate(response)
+            try await BridgeHTTPClient().send(request)
         } catch {
             BridgeLogger().write(
                 "Hook delivery failed: \(BridgeDiagnosticMessage.describe(error))",
@@ -55,13 +54,12 @@ enum AgentPulseBridgeCommand {
             print("Configuration: OK")
 
             let request = try BridgeRequestFactory.makeStateRequest(configuration: configuration)
-            let (_, response) = try await URLSession.shared.data(for: request)
-            try BridgeResponseValidator.validate(response)
+            try await BridgeHTTPClient().send(request)
             print("Local server and authorization: OK")
             return 0
         } catch {
             print("Doctor failed: \(BridgeDiagnosticMessage.describe(error))")
-            return 1
+            return BridgeDoctorExitCode.forError(error)
         }
     }
 }

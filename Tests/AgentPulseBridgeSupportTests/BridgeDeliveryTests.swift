@@ -44,4 +44,10 @@ import Testing
         #expect(BridgeDeliveryFixtures.responseError(statusCode: 500) == .rejected(500))
         #expect(BridgeDeliveryFixtures.responseError(statusCode: nil) == .invalidResponse)
     }
+
+    @Test func urlClientHandlesSuccessRejectionAndTimeout() async {
+        #expect(await BridgeDeliveryFixtures.clientOutcome(path: "/success") == .success)
+        #expect(await BridgeDeliveryFixtures.clientOutcome(path: "/unauthorized") == .rejected(401))
+        #expect(await BridgeDeliveryFixtures.clientOutcome(path: "/timeout") == .timedOut)
+    }
 }

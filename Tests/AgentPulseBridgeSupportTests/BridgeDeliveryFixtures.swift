@@ -11,6 +11,13 @@ struct BridgeRequestSnapshot: Equatable {
     var body: [String: String]
 }
 
+enum BridgeClientOutcome: Equatable {
+    case success
+    case rejected(Int)
+    case timedOut
+    case otherFailure
+}
+
 enum BridgeDeliveryFixtures {
     static func decodedConfiguration(from value: String) -> BridgeConfiguration? {
         try? BridgeConfigurationLoader.decode(Data(value.utf8))
@@ -84,4 +91,59 @@ enum BridgeDeliveryFixtures {
             return nil
         }
     }
+
+    static func clientOutcome(path: String) async -> BridgeClientOutcome {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BridgeURLProtocolStub.self]
+        let client = BridgeHTTPClient(session: URLSession(configuration: configuration))
+        let request = URLRequest(url: URL(string: "http://127.0.0.1\(path)")!)
+
+        do {
+            try await client.send(request)
+            return .success
+        } catch let error as BridgeRequestError {
+            if case .rejected(let statusCode) = error {
+                return .rejected(statusCode)
+            }
+            return .otherFailure
+        } catch let error as URLError where error.code == .timedOut {
+            return .timedOut
+        } catch {
+            return .otherFailure
+        }
+    }
+}
+
+private final class BridgeURLProtocolStub: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "127.0.0.1"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let url = request.url else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+
+        if url.path == "/timeout" {
+            client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
+            return
+        }
+
+        let statusCode = url.path == "/unauthorized" ? 401 : 204
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

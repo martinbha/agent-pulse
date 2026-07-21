@@ -6,6 +6,8 @@ public enum BridgeCommand: Equatable, Sendable {
     case doctor
     case none
 
+    private static let supportedAgents = Set(["claude", "codex"])
+
     public static func parse(_ arguments: [String]) -> BridgeCommand {
         guard let first = arguments.first, !first.isEmpty else {
             return .none
@@ -16,7 +18,7 @@ public enum BridgeCommand: Equatable, Sendable {
         case "--doctor":
             return .doctor
         default:
-            return first.hasPrefix("--") ? .none : .hook(agent: first)
+            return supportedAgents.contains(first) ? .hook(agent: first) : .none
         }
     }
 }

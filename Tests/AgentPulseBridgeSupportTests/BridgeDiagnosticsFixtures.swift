@@ -44,4 +44,8 @@ enum BridgeDiagnosticsFixtures {
     static func diagnosticMessage(for code: URLError.Code) -> String {
         BridgeDiagnosticMessage.describe(URLError(code))
     }
+
+    static func unavailableDoctorExitCode() -> Int32 {
+        BridgeDoctorExitCode.forError(URLError(.cannotConnectToHost))
+    }
 }
