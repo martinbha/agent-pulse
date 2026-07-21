@@ -39,6 +39,23 @@ public enum BridgeRequestFactory {
         request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
         return request
     }
+
+    public static func makeStateRequest(configuration: BridgeConfiguration) throws -> URLRequest {
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = "127.0.0.1"
+        components.port = Int(configuration.port)
+        components.path = "/v1/state"
+
+        guard let url = components.url else {
+            throw BridgeRequestError.invalidEndpoint
+        }
+
+        var request = URLRequest(url: url, timeoutInterval: 1)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+        return request
+    }
 }
 
 public enum BridgeResponseValidator {

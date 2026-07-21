@@ -26,6 +26,7 @@ swift build -c release
 BIN_DIR="$(swift build -c release --show-bin-path)"
 BIN_PATH="$BIN_DIR/agent-pulse"
 NOTIFIER_BIN_PATH="$BIN_DIR/agent-pulse-notifier"
+BRIDGE_BIN_PATH="$BIN_DIR/agent-pulse-hook"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -116,6 +117,10 @@ build_notifier_helper "Agent Pulse Claude" "$BUNDLE_ID.claude" \
   "$ROOT_DIR/Sources/AgentPulseCore/Resources/claude-logo.svg"
 build_notifier_helper "Agent Pulse Codex" "$BUNDLE_ID.codex" \
   "$ROOT_DIR/Sources/AgentPulseCore/Resources/codex-logo.svg"
+
+mkdir -p "$CONTENTS_DIR/Helpers"
+cp "$BRIDGE_BIN_PATH" "$CONTENTS_DIR/Helpers/agent-pulse-hook"
+cp "$ROOT_DIR/VERSION" "$CONTENTS_DIR/Helpers/agent-pulse-hook.version"
 
 write_info_plist "$CONTENTS_DIR/Info.plist" "$APP_NAME" "$BUNDLE_ID" "$APP_ICON_NAME"
 
