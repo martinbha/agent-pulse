@@ -34,6 +34,7 @@ struct SetupTransitionSnapshot {
 
 struct SetupAdapterSnapshot {
     var currentServer: LocalServerHealth
+    var foreignServer: LocalServerHealth
     var mismatchedServer: LocalServerHealth
     var missingBridge: BridgeHealth
     var currentBridge: BridgeHealth
@@ -251,12 +252,20 @@ enum SetupHealthFixtures {
             currentServer: SetupHealthInspector.classifyLocalServerHealth(
                 endpoint: endpoint,
                 response: HealthResponse(ok: true, app: "Status App", version: "1.0.0"),
-                expectedVersion: "1.0.0"
+                expectedVersion: "1.0.0",
+                expectedApplication: "Status App"
+            ),
+            foreignServer: SetupHealthInspector.classifyLocalServerHealth(
+                endpoint: endpoint,
+                response: HealthResponse(ok: true, app: "Other App", version: "1.0.0"),
+                expectedVersion: "1.0.0",
+                expectedApplication: "Status App"
             ),
             mismatchedServer: SetupHealthInspector.classifyLocalServerHealth(
                 endpoint: endpoint,
                 response: HealthResponse(ok: true, app: "Status App", version: "0.9.0"),
-                expectedVersion: "1.0.0"
+                expectedVersion: "1.0.0",
+                expectedApplication: "Status App"
             ),
             missingBridge: SetupHealthInspector.bridgeHealth(from: .missing),
             currentBridge: SetupHealthInspector.bridgeHealth(from: .current(version: "1.0.0")),

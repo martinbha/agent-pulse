@@ -235,7 +235,8 @@ struct SetupHealthInspector {
             return classifyLocalServerHealth(
                 endpoint: endpoint,
                 response: health,
-                expectedVersion: AgentPulseVersion.current
+                expectedVersion: AgentPulseVersion.current,
+                expectedApplication: "Agent Pulse"
             )
         } catch {
             return .unreachable(endpoint: endpoint, reason: error.localizedDescription)
@@ -245,12 +246,19 @@ struct SetupHealthInspector {
     static func classifyLocalServerHealth(
         endpoint: URL,
         response: HealthResponse,
-        expectedVersion: String
+        expectedVersion: String,
+        expectedApplication: String
     ) -> LocalServerHealth {
         guard response.ok, !response.version.isEmpty else {
             return .invalidResponse(
                 endpoint: endpoint,
                 reason: "The health endpoint returned an incomplete response."
+            )
+        }
+        guard response.app == expectedApplication else {
+            return .invalidResponse(
+                endpoint: endpoint,
+                reason: "The configured endpoint belongs to another application."
             )
         }
         guard response.version == expectedVersion else {

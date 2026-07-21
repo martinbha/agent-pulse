@@ -59,6 +59,10 @@ import Testing
             Issue.record("Expected a matching local server version")
             return
         }
+        guard case .invalidResponse = snapshot.foreignServer else {
+            Issue.record("Expected a foreign local service to be rejected")
+            return
+        }
         guard case .invalidResponse = snapshot.mismatchedServer else {
             Issue.record("Expected a mismatched local server version to be rejected")
             return
