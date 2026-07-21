@@ -362,7 +362,13 @@ struct JSONHookConfigurationManager {
             var remainingHandlers: [Any] = []
             var ownedInGroup = 0
             for handlerValue in handlers {
-                if let handler = handlerValue as? [String: Any], isOwned(handler: handler) {
+                guard let handler = handlerValue as? [String: Any] else {
+                    remainingHandlers.append(handlerValue)
+                    containsUnsupportedGroupShape = true
+                    continue
+                }
+
+                if isOwned(handler: handler) {
                     ownedEntryCount += 1
                     ownedInGroup += 1
                 } else {

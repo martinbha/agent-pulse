@@ -72,6 +72,15 @@ import Testing
         #expect(!snapshot.didWrite)
     }
 
+    @Test func unsupportedRequiredHandlerShapeIsBlocked() throws {
+        let snapshot = try JSONHookConfigurationFixtures.unsupportedHandlerShapeIsBlocked()
+
+        #expect(snapshot.blocker == .unsupportedHookStructure("hooks.PreToolUse"))
+        #expect(snapshot.contentsUnchanged)
+        #expect(!snapshot.backupCreated)
+        #expect(!snapshot.didWrite)
+    }
+
     @Test func backupFailurePreventsMutation() throws {
         let snapshot = try JSONHookConfigurationFixtures.backupFailureIsBlocked()
 

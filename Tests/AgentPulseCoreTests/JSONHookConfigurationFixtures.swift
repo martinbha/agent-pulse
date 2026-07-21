@@ -211,6 +211,17 @@ enum JSONHookConfigurationFixtures {
         }
     }
 
+    static func unsupportedHandlerShapeIsBlocked() throws -> JSONHookBlockedSnapshot {
+        try withLayout { layout in
+            let original = try writeJSON(
+                ["hooks": ["PreToolUse": [["hooks": ["invalid-handler"]]]]],
+                to: layout.configuration
+            )
+            let result = makeManager(layout).apply(.install)
+            return blockedSnapshot(result, original: original, configuration: layout.configuration)
+        }
+    }
+
     static func backupFailureIsBlocked() throws -> JSONHookBlockedSnapshot {
         try withLayout { layout in
             let original = try writeJSON(["kept": true], to: layout.configuration)
