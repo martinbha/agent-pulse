@@ -57,9 +57,27 @@ import Testing
             Issue.record("Expected a structured atomic replacement failure")
             return
         }
-        #expect(snapshot.executableContents == "bridge-v1")
+        #expect(snapshot.executableContents == "bridge-v2")
         #expect(snapshot.installedVersion == "1.0.0")
+        #expect(
+            snapshot.statusAfterInterruption
+                == .outdated(installedVersion: "1.0.0", bundledVersion: "2.0.0")
+        )
+        #expect(snapshot.repairedStatus == .current(version: "2.0.0"))
         #expect(snapshot.temporaryFileCount == 0)
+    }
+
+    @Test func rejectsInvalidInstalledAndBundledExecutables() throws {
+        let snapshot = try BridgeInstallerFixtures.invalidExecutableHandling()
+
+        #expect(snapshot.damagedStatus == .damaged(
+            reason: "The installed bridge is not a nonempty regular executable."
+        ))
+        #expect(snapshot.repairedStatus == .current(version: "1.0.0"))
+        guard case .some(.bundledExecutableInvalid(_)) = snapshot.bundledError else {
+            Issue.record("Expected a structured invalid bundled executable failure")
+            return
+        }
     }
 
     @Test func rejectsAppTranslocationBeforeMutation() throws {

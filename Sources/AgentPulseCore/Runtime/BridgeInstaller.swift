@@ -16,6 +16,7 @@ enum BridgeInstallationCheckpoint: Equatable {
 enum BridgeInstallationError: LocalizedError, Equatable {
     case appTranslocated(String)
     case bundledExecutableMissing(String)
+    case bundledExecutableInvalid(String)
     case bundledVersionInvalid(String)
     case directoryCreationFailed(String)
     case copyFailed(String)
@@ -29,6 +30,8 @@ enum BridgeInstallationError: LocalizedError, Equatable {
             return "Move Agent Pulse to /Applications or ~/Applications before installing integrations."
         case .bundledExecutableMissing(let path):
             return "The bundled bridge is missing at \(path). Reinstall Agent Pulse."
+        case .bundledExecutableInvalid(let path):
+            return "The bundled bridge is not a readable, nonempty regular file at \(path). Reinstall Agent Pulse."
         case .bundledVersionInvalid(let path):
             return "The bundled bridge version is missing or invalid at \(path). Reinstall Agent Pulse."
         case .directoryCreationFailed(let path):
@@ -97,8 +100,14 @@ struct BridgeInstaller {
             return .missing
         }
 
+        guard isNonemptyRegularFile(at: paths.installedExecutable) else {
+            return .damaged(reason: "The installed bridge is not a nonempty regular executable.")
+        }
         guard executablePermissions(at: paths.installedExecutable) == 0o755 else {
             return .damaged(reason: "The installed bridge permissions are not 0755.")
+        }
+        guard fileManager.isExecutableFile(atPath: paths.installedExecutable.path) else {
+            return .damaged(reason: "The installed bridge cannot be executed.")
         }
         guard directoryPermissions(at: paths.rootDirectory) == 0o700,
               directoryPermissions(at: paths.binDirectory) == 0o700 else {
@@ -159,8 +168,12 @@ struct BridgeInstaller {
     private func reconcile() throws -> BridgeInstallationStatus {
         try rejectTranslocatedApp()
         let bundledVersion = try readBundledVersion()
-        guard fileManager.isReadableFile(atPath: paths.bundledExecutable.path) else {
+        guard fileManager.fileExists(atPath: paths.bundledExecutable.path) else {
             throw BridgeInstallationError.bundledExecutableMissing(paths.bundledExecutable.path)
+        }
+        guard fileManager.isReadableFile(atPath: paths.bundledExecutable.path),
+              isNonemptyRegularFile(at: paths.bundledExecutable) else {
+            throw BridgeInstallationError.bundledExecutableInvalid(paths.bundledExecutable.path)
         }
 
         if try status() == .current(version: bundledVersion) {
@@ -292,5 +305,14 @@ struct BridgeInstaller {
 
     private func directoryPermissions(at url: URL) -> Int? {
         executablePermissions(at: url)
+    }
+
+    private func isNonemptyRegularFile(at url: URL) -> Bool {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let size = attributes[.size] as? NSNumber else {
+            return false
+        }
+        return size.uint64Value > 0
     }
 }

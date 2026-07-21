@@ -40,7 +40,15 @@ struct BridgeInterruptedReplacementSnapshot {
     var error: BridgeInstallationError?
     var executableContents: String
     var installedVersion: String
+    var statusAfterInterruption: BridgeInstallationStatus
+    var repairedStatus: BridgeInstallationStatus
     var temporaryFileCount: Int
+}
+
+struct BridgeInvalidExecutableSnapshot {
+    var damagedStatus: BridgeInstallationStatus
+    var repairedStatus: BridgeInstallationStatus
+    var bundledError: BridgeInstallationError?
 }
 
 struct BridgeTranslocationSnapshot {
@@ -177,7 +185,7 @@ enum BridgeInstallerFixtures {
                 homeDirectory: layout.home,
                 bundleURL: layout.bundle,
                 checkpointHandler: { checkpoint in
-                    if checkpoint == .stagedExecutable {
+                    if checkpoint == .stagedVersion {
                         throw FixtureError.interrupted
                     }
                 }
@@ -189,20 +197,60 @@ enum BridgeInstallerFixtures {
                 capturedError = error
             }
 
+            let executableContents = try String(
+                contentsOf: interruptedInstaller.paths.installedExecutable,
+                encoding: .utf8
+            )
+            let installedVersion = try String(
+                contentsOf: interruptedInstaller.paths.installedVersion,
+                encoding: .utf8
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            let statusAfterInterruption = try interruptedInstaller.status()
+            let repairedStatus = try BridgeInstaller(
+                homeDirectory: layout.home,
+                bundleURL: layout.bundle
+            ).repair()
+
             let directoryContents = try FileManager.default.contentsOfDirectory(
                 atPath: interruptedInstaller.paths.binDirectory.path
             )
             return BridgeInterruptedReplacementSnapshot(
                 error: capturedError,
-                executableContents: try String(
-                    contentsOf: interruptedInstaller.paths.installedExecutable,
-                    encoding: .utf8
-                ),
-                installedVersion: try String(
-                    contentsOf: interruptedInstaller.paths.installedVersion,
-                    encoding: .utf8
-                ).trimmingCharacters(in: .whitespacesAndNewlines),
+                executableContents: executableContents,
+                installedVersion: installedVersion,
+                statusAfterInterruption: statusAfterInterruption,
+                repairedStatus: repairedStatus,
                 temporaryFileCount: directoryContents.filter { $0.hasSuffix(".tmp") }.count
+            )
+        }
+    }
+
+    static func invalidExecutableHandling() throws -> BridgeInvalidExecutableSnapshot {
+        try withLayout { layout in
+            try writeBundle(layout.bundle, version: "1.0.0", executable: "bridge-v1")
+            let installer = BridgeInstaller(homeDirectory: layout.home, bundleURL: layout.bundle)
+            try installer.install()
+            try Data().write(to: installer.paths.installedExecutable)
+
+            let damagedStatus = try installer.status()
+            let repairedStatus = try installer.repair()
+
+            try FileManager.default.removeItem(at: installer.paths.bundledExecutable)
+            try FileManager.default.createDirectory(
+                at: installer.paths.bundledExecutable,
+                withIntermediateDirectories: false
+            )
+            var bundledError: BridgeInstallationError?
+            do {
+                try installer.repair()
+            } catch let error as BridgeInstallationError {
+                bundledError = error
+            }
+
+            return BridgeInvalidExecutableSnapshot(
+                damagedStatus: damagedStatus,
+                repairedStatus: repairedStatus,
+                bundledError: bundledError
             )
         }
     }
