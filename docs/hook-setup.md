@@ -1,6 +1,6 @@
 # Hook Setup
 
-Agent Pulse receives events from Claude Code and Codex through a small bridge script.
+Agent Pulse receives events from Claude Code and Codex through a small native bridge.
 
 The app writes local connection details to:
 
@@ -8,19 +8,21 @@ The app writes local connection details to:
 ~/.agent-pulse/config.json
 ```
 
-The bridge script reads that file, normalizes hook payloads, and sends events to:
+The bridge reads that file, normalizes hook payloads, and sends events to:
 
 ```text
 http://127.0.0.1:37462/v1/events
 ```
 
-## Install the bridge script
+## Install the native bridge
 
 From this repository:
 
 ```bash
-mkdir -p "$HOME/.agent-pulse"
-install -m 755 scripts/agent-pulse-hook "$HOME/.agent-pulse/agent-pulse-hook"
+scripts/build-app-bundle
+install -d -m 700 "$HOME/.agent-pulse/bin"
+install -m 755 "dist/Agent Pulse.app/Contents/Helpers/agent-pulse-hook" \
+  "$HOME/.agent-pulse/bin/agent-pulse-hook"
 ```
 
 Start Agent Pulse once before testing hooks so `~/.agent-pulse/config.json` exists.
@@ -37,7 +39,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -48,7 +50,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -60,7 +62,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -72,7 +74,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -83,7 +85,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -94,7 +96,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -105,7 +107,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -116,7 +118,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -127,7 +129,7 @@ Add hooks to `~/.claude/settings.json`.
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.agent-pulse/agent-pulse-hook claude",
+            "command": "$HOME/.agent-pulse/bin/agent-pulse-hook claude",
             "timeout": 2
           }
         ]
@@ -146,14 +148,14 @@ Add hooks to `~/.codex/config.toml`.
 matcher = "startup|resume|clear|compact"
 [[hooks.SessionStart.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
 [[hooks.UserPromptSubmit]]
 [[hooks.UserPromptSubmit.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
@@ -161,7 +163,7 @@ statusMessage = "Updating Agent Pulse"
 matcher = "*"
 [[hooks.PreToolUse.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
@@ -169,7 +171,7 @@ statusMessage = "Updating Agent Pulse"
 matcher = "*"
 [[hooks.PostToolUse.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
@@ -177,28 +179,28 @@ statusMessage = "Updating Agent Pulse"
 matcher = "*"
 [[hooks.PermissionRequest.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
 [[hooks.Stop]]
 [[hooks.Stop.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
 [[hooks.StopFailure]]
 [[hooks.StopFailure.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 
 [[hooks.SubagentStop]]
 [[hooks.SubagentStop.hooks]]
 type = "command"
-command = "$HOME/.agent-pulse/agent-pulse-hook codex"
+command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
 ```
@@ -209,12 +211,12 @@ With Agent Pulse running, execute this from any project directory:
 
 ```bash
 printf '{"hook_event_name":"UserPromptSubmit"}' \
-  | "$HOME/.agent-pulse/agent-pulse-hook" codex
+  | "$HOME/.agent-pulse/bin/agent-pulse-hook" codex
 ```
 
 Then query state:
 
 ```bash
-TOKEN="$(python3 -c 'import json, pathlib; print(json.loads(pathlib.Path("~/.agent-pulse/config.json").expanduser().read_text())["token"])')"
+TOKEN="$(plutil -extract token raw "$HOME/.agent-pulse/config.json")"
 curl http://127.0.0.1:37462/v1/state -H "Authorization: Bearer $TOKEN"
 ```

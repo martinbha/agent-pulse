@@ -11,9 +11,15 @@ let package = Package(
     ],
     products: [
         .executable(name: "agent-pulse", targets: ["AgentPulse"]),
-        .executable(name: "agent-pulse-notifier", targets: ["AgentPulseNotifier"])
+        .executable(name: "agent-pulse-notifier", targets: ["AgentPulseNotifier"]),
+        .executable(name: "agent-pulse-hook", targets: ["AgentPulseBridge"])
     ],
     targets: [
+        .target(
+            name: "AgentPulseBridgeSupport",
+            path: "Sources/AgentPulseBridgeSupport",
+            swiftSettings: swift5Mode
+        ),
         .target(
             name: "AgentPulseCore",
             path: "Sources/AgentPulseCore",
@@ -32,10 +38,22 @@ let package = Package(
             path: "Sources/AgentPulseNotifier",
             swiftSettings: swift5Mode
         ),
+        .executableTarget(
+            name: "AgentPulseBridge",
+            dependencies: ["AgentPulseBridgeSupport"],
+            path: "Sources/AgentPulseBridge",
+            swiftSettings: swift5Mode
+        ),
         .testTarget(
             name: "AgentPulseCoreTests",
             dependencies: ["AgentPulseCore"],
             path: "Tests/AgentPulseCoreTests",
+            swiftSettings: swift5Mode
+        ),
+        .testTarget(
+            name: "AgentPulseBridgeSupportTests",
+            dependencies: ["AgentPulseBridgeSupport"],
+            path: "Tests/AgentPulseBridgeSupportTests",
             swiftSettings: swift5Mode
         )
     ]
