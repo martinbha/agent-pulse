@@ -41,6 +41,7 @@ import Testing
         #expect(snapshot.duplicatedHooksAction == .repairIntegration(.codex))
         #expect(snapshot.invalidHooksAction == .reviewIntegrationConfiguration(.codex))
         #expect(snapshot.unsafeConfigurationAction == .reviewIntegrationConfiguration(.codex))
+        #expect(snapshot.unsafeIntegrationAction == .reviewIntegrationConfiguration(.codex))
         #expect(snapshot.removedHooksAction == .installIntegration(.codex))
         #expect(snapshot.signInAction == .signIn(.claude))
         #expect(snapshot.testAction == .testIntegration(.claude))

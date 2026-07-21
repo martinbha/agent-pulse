@@ -21,6 +21,7 @@ struct SetupTransitionSnapshot {
     var duplicatedHooksAction: SetupRecommendedAction
     var invalidHooksAction: SetupRecommendedAction
     var unsafeConfigurationAction: SetupRecommendedAction
+    var unsafeIntegrationAction: SetupRecommendedAction?
     var removedHooksAction: SetupRecommendedAction
     var signInAction: SetupRecommendedAction
     var testAction: SetupRecommendedAction
@@ -151,6 +152,7 @@ enum SetupHealthFixtures {
         missingEvent[.claude] = .idle(agent: .claude)
 
         let complete = snapshot()
+        let unsafe = snapshot(hosts: oneHostMissing, hooks: invalidHooks)
         return SetupTransitionSnapshot(
             translocatedAction: snapshot(
                 application: .translocated(
@@ -169,10 +171,8 @@ enum SetupHealthFixtures {
             ).recommendedAction,
             duplicatedHooksAction: snapshot(hooks: duplicatedHooks).recommendedAction,
             invalidHooksAction: snapshot(hooks: invalidHooks).recommendedAction,
-            unsafeConfigurationAction: snapshot(
-                hosts: oneHostMissing,
-                hooks: invalidHooks
-            ).recommendedAction,
+            unsafeConfigurationAction: unsafe.recommendedAction,
+            unsafeIntegrationAction: unsafe.integration(for: .codex)?.recommendedAction,
             removedHooksAction: snapshot(hooks: removedHooks).recommendedAction,
             signInAction: snapshot(usage: missingAuth).recommendedAction,
             testAction: snapshot(events: missingEvent).recommendedAction,

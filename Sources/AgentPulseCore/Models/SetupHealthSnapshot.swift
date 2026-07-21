@@ -319,6 +319,9 @@ enum SetupHealthClassifier {
         usage: SetupUsageHealth,
         lastEvent: LastIntegrationEventHealth
     ) -> SetupRecommendedAction {
+        if case .invalid = hooks {
+            return .reviewIntegrationConfiguration(agent)
+        }
         if host == .unavailable {
             return .installHost(agent)
         }
@@ -327,9 +330,7 @@ enum SetupHealthClassifier {
             return .installIntegration(agent)
         case .outdated, .duplicated:
             return .repairIntegration(agent)
-        case .invalid:
-            return .reviewIntegrationConfiguration(agent)
-        case .current:
+        case .current, .invalid:
             break
         }
         switch usage {
