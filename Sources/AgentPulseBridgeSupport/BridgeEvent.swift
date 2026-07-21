@@ -1,6 +1,6 @@
 import Foundation
 
-struct BridgeEvent: Codable, Equatable, Sendable {
+public struct BridgeEvent: Codable, Equatable, Sendable {
     var agent: String
     var state: String
     var event: String

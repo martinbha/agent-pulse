@@ -1,6 +1,6 @@
 import Foundation
 
-enum BridgeEventNormalizer {
+public enum BridgeEventNormalizer {
     private static let stateByEvent = [
         "SessionStart": "idle",
         "UserPromptSubmit": "working",
@@ -14,7 +14,7 @@ enum BridgeEventNormalizer {
         "SessionEnd": "idle",
     ]
 
-    static func decodeInput(_ data: Data) -> [String: Any] {
+    public static func decodeInput(_ data: Data) -> [String: Any] {
         guard !data.isEmpty,
               let object = try? JSONSerialization.jsonObject(with: data),
               let dictionary = object as? [String: Any]
@@ -25,7 +25,7 @@ enum BridgeEventNormalizer {
         return dictionary
     }
 
-    static func normalize(
+    public static func normalize(
         agent: String,
         input: [String: Any],
         currentDirectory: String,
