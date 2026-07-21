@@ -9,10 +9,16 @@ final class AgentPulseSettings: ObservableObject {
     @Published private(set) var bridgeConfigPath: String
 
     private let defaults: UserDefaults
+    private let bridgeConfigURL: URL
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        bridgeConfigURL: URL? = nil
+    ) {
+        let bridgeConfigURL = bridgeConfigURL ?? Self.defaultBridgeConfigURL
         self.defaults = defaults
-        self.bridgeConfigPath = Self.bridgeConfigURL.path
+        self.bridgeConfigURL = bridgeConfigURL
+        self.bridgeConfigPath = bridgeConfigURL.path
 
         let storedPort = defaults.integer(forKey: Keys.port)
         if storedPort > 0 && storedPort <= UInt16.max {
@@ -48,16 +54,24 @@ final class AgentPulseSettings: ObservableObject {
         let config = BridgeConfig(port: port, token: token)
 
         do {
-            let directory = Self.bridgeConfigURL.deletingLastPathComponent()
+            let directory = bridgeConfigURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: directory.path
+            )
             let data = try AgentPulseJSON.encoder.encode(config)
-            try data.write(to: Self.bridgeConfigURL, options: .atomic)
+            try data.write(to: bridgeConfigURL, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: bridgeConfigURL.path
+            )
         } catch {
             // Hook delivery must remain best-effort; the UI still exposes token copy actions.
         }
     }
 
-    private static var bridgeConfigURL: URL {
+    private static var defaultBridgeConfigURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".agent-pulse", isDirectory: true)
             .appendingPathComponent("config.json")
