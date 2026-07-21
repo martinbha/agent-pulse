@@ -55,6 +55,17 @@ enum HookConfigurationHealth: Equatable, Sendable {
     case invalid(String)
 }
 
+enum SetupUsageHealth: Equatable, Sendable {
+    case loading
+    case available
+    case missingAuth
+    case accessDenied
+    case sessionExpired
+    case notInstalled
+    case notLoggedIn
+    case error
+}
+
 enum LastIntegrationEventHealth: Equatable, Sendable {
     case never
     case received(event: String, timestamp: Date, age: TimeInterval)
@@ -103,7 +114,7 @@ struct IntegrationHealthSnapshot: Equatable, Identifiable, Sendable {
     let agent: AgentKind
     let host: IntegrationHostHealth
     let hooks: HookConfigurationHealth
-    let usage: UsageAvailability
+    let usage: SetupUsageHealth
     let lastEvent: LastIntegrationEventHealth
     let recommendedAction: SetupRecommendedAction
 
@@ -168,7 +179,7 @@ enum SetupHealthClassifier {
         let integrations = AgentKind.allCases.map { agent in
             let host = hosts[agent] ?? .unavailable
             let hook = hooks[agent] ?? .missing
-            let availability = usage[agent] ?? .loading
+            let availability = setupUsageHealth(from: usage[agent] ?? .loading)
             let lastEvent = lastEventHealth(from: events[agent], inspectedAt: inspectedAt)
             return IntegrationHealthSnapshot(
                 agent: agent,
@@ -301,7 +312,7 @@ enum SetupHealthClassifier {
         agent: AgentKind,
         host: IntegrationHostHealth,
         hooks: HookConfigurationHealth,
-        usage: UsageAvailability,
+        usage: SetupUsageHealth,
         lastEvent: LastIntegrationEventHealth
     ) -> SetupRecommendedAction {
         if host == .unavailable {
@@ -343,6 +354,19 @@ enum SetupHealthClassifier {
             timestamp: snapshot.updatedAt,
             age: max(0, inspectedAt.timeIntervalSince(snapshot.updatedAt))
         )
+    }
+
+    private static func setupUsageHealth(from availability: UsageAvailability) -> SetupUsageHealth {
+        switch availability {
+        case .loading: return .loading
+        case .available: return .available
+        case .missingAuth: return .missingAuth
+        case .accessDenied: return .accessDenied
+        case .sessionExpired: return .sessionExpired
+        case .notInstalled: return .notInstalled
+        case .notLoggedIn: return .notLoggedIn
+        case .error: return .error
+        }
     }
 
     private static func blocked(
@@ -431,7 +455,7 @@ enum SetupHealthDiagnosticsRenderer {
         }
     }
 
-    private static func usageSummary(_ availability: UsageAvailability) -> String {
+    private static func usageSummary(_ availability: SetupUsageHealth) -> String {
         switch availability {
         case .loading: return "loading"
         case .available: return "available"
@@ -440,7 +464,7 @@ enum SetupHealthDiagnosticsRenderer {
         case .sessionExpired: return "session expired"
         case .notInstalled: return "host not installed"
         case .notLoggedIn: return "not logged in"
-        case .error(let message): return "error: \(message)"
+        case .error: return "error"
         }
     }
 
