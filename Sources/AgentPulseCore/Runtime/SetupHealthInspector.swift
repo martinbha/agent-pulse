@@ -232,16 +232,34 @@ struct SetupHealthInspector {
                 )
             }
             let health = try AgentPulseJSON.decoder.decode(HealthResponse.self, from: data)
-            guard health.ok, !health.version.isEmpty else {
-                return .invalidResponse(
-                    endpoint: endpoint,
-                    reason: "The health endpoint returned an incomplete response."
-                )
-            }
-            return .healthy(endpoint: endpoint, version: health.version)
+            return classifyLocalServerHealth(
+                endpoint: endpoint,
+                response: health,
+                expectedVersion: AgentPulseVersion.current
+            )
         } catch {
             return .unreachable(endpoint: endpoint, reason: error.localizedDescription)
         }
+    }
+
+    static func classifyLocalServerHealth(
+        endpoint: URL,
+        response: HealthResponse,
+        expectedVersion: String
+    ) -> LocalServerHealth {
+        guard response.ok, !response.version.isEmpty else {
+            return .invalidResponse(
+                endpoint: endpoint,
+                reason: "The health endpoint returned an incomplete response."
+            )
+        }
+        guard response.version == expectedVersion else {
+            return .invalidResponse(
+                endpoint: endpoint,
+                reason: "The running server version does not match this application."
+            )
+        }
+        return .healthy(endpoint: endpoint, version: response.version)
     }
 
     @MainActor

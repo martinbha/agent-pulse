@@ -55,6 +55,14 @@ import Testing
     @Test func bridgeAndConfigurationResultsMapToSharedStatuses() {
         let snapshot = SetupHealthFixtures.adapters()
 
+        guard case .healthy = snapshot.currentServer else {
+            Issue.record("Expected a matching local server version")
+            return
+        }
+        guard case .invalidResponse = snapshot.mismatchedServer else {
+            Issue.record("Expected a mismatched local server version to be rejected")
+            return
+        }
         #expect(snapshot.missingBridge == .missing)
         #expect(snapshot.currentBridge == .current(version: "1.0.0"))
         #expect(
