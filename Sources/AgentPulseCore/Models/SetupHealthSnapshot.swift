@@ -401,11 +401,13 @@ enum SetupHealthDiagnosticsRenderer {
             )
         }
         lines += [
-            "Notifications: \(String(describing: snapshot.notifications))",
-            "Launch at Login: \(String(describing: snapshot.launchAtLogin))",
+            "Notifications: \(notificationSummary(snapshot.notifications))",
+            "Launch at Login: \(launchAtLoginSummary(snapshot.launchAtLogin))",
         ]
         if let issue = snapshot.blockingIssue {
             lines.append("Action required: \(issue.message)")
+        } else if snapshot.recommendedAction != .none {
+            lines.append("Recommended action: \(actionSummary(snapshot.recommendedAction))")
         }
         return lines
     }
@@ -477,6 +479,47 @@ enum SetupHealthDiagnosticsRenderer {
         case .never: return "never"
         case .received(let event, let timestamp, let age):
             return "\(event) at \(timestamp) (\(Int(age)) seconds ago)"
+        }
+    }
+
+    private static func notificationSummary(_ health: NotificationAuthorizationHealth) -> String {
+        switch health {
+        case .notDetermined: return "not requested"
+        case .denied: return "denied"
+        case .authorized: return "authorized"
+        case .provisional: return "provisional"
+        case .ephemeral: return "ephemeral"
+        case .unavailable(let reason): return "unavailable: \(reason)"
+        }
+    }
+
+    private static func launchAtLoginSummary(_ health: LaunchAtLoginHealth) -> String {
+        switch health {
+        case .notRegistered: return "not registered"
+        case .enabled: return "enabled"
+        case .requiresApproval: return "requires approval"
+        case .notFound: return "not found"
+        case .unavailable(let reason): return "unavailable: \(reason)"
+        }
+    }
+
+    private static func actionSummary(_ action: SetupRecommendedAction) -> String {
+        switch action {
+        case .moveApplication: return "move the application"
+        case .restartLocalServer: return "restart the local server"
+        case .installBridge: return "install the bridge"
+        case .repairBridge: return "repair the bridge"
+        case .installHost(let agent): return "install \(agent.displayName)"
+        case .installIntegration(let agent): return "set up \(agent.displayName)"
+        case .repairIntegration(let agent): return "repair \(agent.displayName) integration"
+        case .reviewIntegrationConfiguration(let agent):
+            return "review \(agent.displayName) configuration"
+        case .signIn(let agent): return "sign in to \(agent.displayName)"
+        case .testIntegration(let agent): return "test \(agent.displayName) integration"
+        case .requestNotificationPermission: return "request notification permission"
+        case .openNotificationSettings: return "open notification settings"
+        case .approveLaunchAtLogin: return "approve Launch at Login"
+        case .none: return "none"
         }
     }
 }
