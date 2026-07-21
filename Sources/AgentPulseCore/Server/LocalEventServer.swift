@@ -2,6 +2,9 @@ import Foundation
 import Network
 
 final class LocalEventServer: @unchecked Sendable {
+    static let maximumRequestSize = 1_048_576
+    static let requestTimeout: TimeInterval = 5
+
     private let port: UInt16
     private let tokenStore: ServerTokenStore
     private let eventHandler: (AgentEvent) async -> Void
@@ -68,13 +71,30 @@ final class LocalEventServer: @unchecked Sendable {
     }
 
     private func handle(_ connection: NWConnection) {
+        let timeout = scheduleIdleTimeout(for: connection)
         connection.start(queue: queue)
-        receive(from: connection, buffer: Data())
+        receive(from: connection, buffer: Data(), timeout: timeout)
     }
 
-    private func receive(from connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, isComplete, error in
+    private func scheduleIdleTimeout(for connection: NWConnection) -> DispatchWorkItem {
+        let timeout = DispatchWorkItem {
+            connection.cancel()
+        }
+        queue.asyncAfter(deadline: .now() + Self.requestTimeout, execute: timeout)
+        return timeout
+    }
+
+    private func receive(
+        from connection: NWConnection,
+        buffer: Data,
+        timeout: DispatchWorkItem
+    ) {
+        let remainingCapacity = max(0, Self.maximumRequestSize - buffer.count)
+        let receiveLength = min(65_536, remainingCapacity + 1)
+
+        connection.receive(minimumIncompleteLength: 1, maximumLength: receiveLength) { [weak self] data, _, isComplete, error in
             guard let self else {
+                timeout.cancel()
                 connection.cancel()
                 return
             }
@@ -84,20 +104,41 @@ final class LocalEventServer: @unchecked Sendable {
                 nextBuffer.append(data)
             }
 
-            if let request = HTTPRequest.parse(nextBuffer) {
+            switch HTTPRequest.parse(nextBuffer, maximumSize: Self.maximumRequestSize) {
+            case .request(let request):
+                timeout.cancel()
                 Task {
                     let response = await self.route(request)
                     self.send(response, on: connection)
                 }
                 return
+            case .malformed:
+                timeout.cancel()
+                send(.error("Invalid request", statusCode: 400, reason: "Bad Request"), on: connection)
+                return
+            case .tooLarge:
+                timeout.cancel()
+                send(.error("Request too large", statusCode: 413, reason: "Payload Too Large"), on: connection)
+                return
+            case .incomplete:
+                break
             }
 
             if error != nil || isComplete {
+                timeout.cancel()
                 send(.error("Invalid request", statusCode: 400, reason: "Bad Request"), on: connection)
                 return
             }
 
-            receive(from: connection, buffer: nextBuffer)
+            let nextTimeout: DispatchWorkItem
+            if let data, !data.isEmpty {
+                timeout.cancel()
+                nextTimeout = scheduleIdleTimeout(for: connection)
+            } else {
+                nextTimeout = timeout
+            }
+
+            receive(from: connection, buffer: nextBuffer, timeout: nextTimeout)
         }
     }
 
