@@ -104,7 +104,13 @@ final class LocalEventServer: @unchecked Sendable {
 
         switch (request.method, request.path) {
         case ("GET", "/v1/health"):
-            return .json(HealthResponse(ok: true, app: "Agent Pulse", version: "0.1.0"))
+            return .json(
+                HealthResponse(
+                    ok: true,
+                    app: "Agent Pulse",
+                    version: AgentPulseVersion.current
+                )
+            )
 
         case ("GET", "/v1/state"):
             return .json(await stateProvider())
@@ -133,4 +139,3 @@ final class LocalEventServer: @unchecked Sendable {
         })
     }
 }
-

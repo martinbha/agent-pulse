@@ -13,6 +13,12 @@ APP_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulseCore/Resources/agent-pulse-icon.svg
 MENU_BAR_ICON_SOURCE="$ROOT_DIR/Sources/AgentPulseCore/Resources/agent-pulse-menubar.svg"
 APP_ICON_NAME="AgentPulse"
 BUNDLE_VERSION="3"
+APP_VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")"
+
+if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Invalid app version in $ROOT_DIR/VERSION: $APP_VERSION" >&2
+  exit 1
+fi
 
 cd "$ROOT_DIR"
 swift build -c release
@@ -76,7 +82,7 @@ write_info_plist() {
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
   <string>$BUNDLE_VERSION</string>
   <key>LSMinimumSystemVersion</key>
