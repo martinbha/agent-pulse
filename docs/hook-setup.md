@@ -144,6 +144,7 @@ Add hooks to `~/.claude/settings.json`.
 Add hooks to `~/.codex/config.toml`.
 
 ```toml
+# BEGIN agent-pulse
 [[hooks.SessionStart]]
 matcher = "startup|resume|clear|compact"
 [[hooks.SessionStart.hooks]]
@@ -189,21 +190,11 @@ type = "command"
 command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
 timeout = 2
 statusMessage = "Updating Agent Pulse"
-
-[[hooks.StopFailure]]
-[[hooks.StopFailure.hooks]]
-type = "command"
-command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
-timeout = 2
-statusMessage = "Updating Agent Pulse"
-
-[[hooks.SubagentStop]]
-[[hooks.SubagentStop.hooks]]
-type = "command"
-command = "$HOME/.agent-pulse/bin/agent-pulse-hook codex"
-timeout = 2
-statusMessage = "Updating Agent Pulse"
+# END agent-pulse
 ```
+
+The TOML integration supports only the six event tables shown above. Agent
+Pulse owns the marker-delimited block and leaves all other TOML content intact.
 
 ## Manual test
 
