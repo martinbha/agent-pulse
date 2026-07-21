@@ -3,7 +3,7 @@ import Network
 
 final class LocalEventServer: @unchecked Sendable {
     private let port: UInt16
-    private let token: String
+    private let tokenStore: ServerTokenStore
     private let eventHandler: (AgentEvent) async -> Void
     private let stateProvider: () async -> ServerStateResponse
     private let clearHandler: () async -> Void
@@ -21,7 +21,7 @@ final class LocalEventServer: @unchecked Sendable {
         statusHandler: @escaping (String) -> Void
     ) {
         self.port = port
-        self.token = token
+        self.tokenStore = ServerTokenStore(token: token)
         self.eventHandler = eventHandler
         self.stateProvider = stateProvider
         self.clearHandler = clearHandler
@@ -46,6 +46,10 @@ final class LocalEventServer: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
+    }
+
+    func updateToken(_ token: String) {
+        tokenStore.replace(with: token)
     }
 
     private func handle(_ state: NWListener.State) {
@@ -98,7 +102,7 @@ final class LocalEventServer: @unchecked Sendable {
     }
 
     private func route(_ request: HTTPRequest) async -> HTTPResponse {
-        guard request.path == "/v1/health" || request.bearerToken == token else {
+        guard request.path == "/v1/health" || tokenStore.matches(request.bearerToken) else {
             return .error("Unauthorized", statusCode: 401, reason: "Unauthorized")
         }
 

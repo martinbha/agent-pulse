@@ -112,11 +112,13 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     func regenerateToken() {
-        server?.stop()
-        server = nil
         settings.regenerateToken()
-        serverStatus = "Restarting local server..."
-        startServer()
+        if let server {
+            server.updateToken(settings.token)
+        } else {
+            serverStatus = "Starting local server..."
+            startServer()
+        }
     }
 
     private func startServer() {
