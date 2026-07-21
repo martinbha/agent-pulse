@@ -19,4 +19,12 @@ import Testing
         #expect(store.matches("replacement-token"))
         #expect(!store.matches("initial-token"))
     }
+
+    @Test func rejectsDifferentLengthAndUnicodeTokens() {
+        let store = ServerTokenStore(token: "token-123")
+
+        #expect(!store.matches("token-1234"))
+        #expect(!store.matches("token-12"))
+        #expect(!store.matches("tøken-123"))
+    }
 }

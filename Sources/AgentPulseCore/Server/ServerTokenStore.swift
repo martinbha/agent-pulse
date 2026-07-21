@@ -21,6 +21,17 @@ final class ServerTokenStore: @unchecked Sendable {
 
         lock.lock()
         defer { lock.unlock() }
-        return candidate == token
+
+        let candidateBytes = Array(candidate.utf8)
+        let tokenBytes = Array(token.utf8)
+        var difference = candidateBytes.count ^ tokenBytes.count
+
+        for index in 0..<max(candidateBytes.count, tokenBytes.count) {
+            let candidateByte = index < candidateBytes.count ? candidateBytes[index] : 0
+            let tokenByte = index < tokenBytes.count ? tokenBytes[index] : 0
+            difference |= Int(candidateByte ^ tokenByte)
+        }
+
+        return difference == 0
     }
 }
