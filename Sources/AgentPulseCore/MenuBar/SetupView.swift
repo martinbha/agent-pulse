@@ -225,10 +225,9 @@ struct SetupView: View {
             if !operations.isEmpty {
                 HStack(spacing: 8) {
                     ForEach(Array(operations.enumerated()), id: \.offset) { _, operation in
-                        operationButton(operation)
+                        operationButton(operation, mutationsBlocked: mutationsBlocked)
                     }
                 }
-                .disabled(mutationsBlocked)
             }
         }
         .setupCard()
@@ -384,10 +383,11 @@ struct SetupView: View {
             Button("Open \(agent.displayName)") {
                 Task { _ = await runtime.appLauncher.open(agent) }
             }
+        case .testIntegration(let agent):
+            operationButton(.test(agent))
         case .installHost,
              .installIntegration,
              .repairIntegration,
-             .testIntegration,
              .requestNotificationPermission,
              .openNotificationSettings,
              .approveLaunchAtLogin,
@@ -396,7 +396,10 @@ struct SetupView: View {
         }
     }
 
-    private func operationButton(_ operation: SetupOperation) -> some View {
+    private func operationButton(
+        _ operation: SetupOperation,
+        mutationsBlocked: Bool = false
+    ) -> some View {
         Button(role: isRemoval(operation) ? .destructive : nil) {
             if case .remove(let agent) = operation {
                 pendingRemovalAgent = agent
@@ -414,7 +417,11 @@ struct SetupView: View {
                 Text(operation.title)
             }
         }
-        .disabled(workflow.activeOperation != nil || workflow.isRefreshing)
+        .disabled(
+            workflow.activeOperation != nil
+                || workflow.isRefreshing
+                || (mutationsBlocked && operation.changesFiles)
+        )
     }
 
     private func statusRow(_ title: String, _ value: String, icon: String) -> some View {
@@ -479,7 +486,7 @@ struct SetupView: View {
         case .signIn:
             return "Sign in through \(integration.agent.displayName), then refresh usage."
         case .testIntegration:
-            return "No hook event has arrived yet. Use \(integration.agent.displayName) once, then refresh."
+            return "No hook event has arrived yet. Run Test to verify delivery without creating a normal status or notification."
         case .reviewIntegrationConfiguration:
             if case .invalid(let reason) = integration.hooks {
                 return "Agent Pulse left this configuration unchanged: \(reason)"

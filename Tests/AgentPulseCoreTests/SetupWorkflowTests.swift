@@ -20,7 +20,7 @@ import Testing
         let snapshot = SetupWorkflowFixtures.integrationOperations()
 
         #expect(snapshot.missing == [.setUp(.claude)])
-        #expect(snapshot.current == [.remove(.claude)])
+        #expect(snapshot.current == [.test(.claude), .remove(.claude)])
         #expect(snapshot.outdated == [.repair(.claude), .remove(.claude)])
         #expect(snapshot.invalid.isEmpty)
         #expect(snapshot.unavailable.isEmpty)
@@ -57,6 +57,15 @@ import Testing
         #expect(snapshot.noticeMessage == "The configuration is read-only.")
         #expect(snapshot.noticeRecovery == "Restore write access, then retry.")
         #expect(snapshot.isOperationComplete)
+    }
+
+    @Test @MainActor func selfTestResultRemainsAvailableAndRefreshesHealth() async {
+        let snapshot = await SetupWorkflowFixtures.successfulSelfTest()
+
+        #expect(snapshot.executed == [.test(.codex)])
+        #expect(snapshot.inspectionCount == 1)
+        #expect(snapshot.noticeKind == .success)
+        #expect(snapshot.noticeMessage == "Delivery verified")
     }
 
     @Test @MainActor func translocationPreventsConfigurationMutation() async {

@@ -1,15 +1,17 @@
 import Foundation
+import AgentPulseBridgeSupport
 
 enum SetupOperation: Equatable {
     case installBridge
     case repairBridge
     case setUp(AgentKind)
     case repair(AgentKind)
+    case test(AgentKind)
     case remove(AgentKind)
 
     var agent: AgentKind? {
         switch self {
-        case .setUp(let agent), .repair(let agent), .remove(let agent):
+        case .setUp(let agent), .repair(let agent), .test(let agent), .remove(let agent):
             return agent
         case .installBridge, .repairBridge:
             return nil
@@ -22,7 +24,17 @@ enum SetupOperation: Equatable {
         case .repairBridge: return "Repair Bridge"
         case .setUp: return "Set Up"
         case .repair: return "Repair"
+        case .test: return "Test"
         case .remove: return "Remove"
+        }
+    }
+
+    var changesFiles: Bool {
+        switch self {
+        case .test:
+            return false
+        case .installBridge, .repairBridge, .setUp, .repair, .remove:
+            return true
         }
     }
 }
@@ -98,7 +110,7 @@ enum SetupIntegrationOperations {
             }
             return [.setUp(integration.agent)]
         case .current:
-            return [.remove(integration.agent)]
+            return [.test(integration.agent), .remove(integration.agent)]
         case .outdated, .duplicated:
             return [.repair(integration.agent), .remove(integration.agent)]
         case .invalid:
@@ -155,6 +167,7 @@ final class SetupWorkflow: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var activeOperation: SetupOperation?
     @Published private(set) var notice: SetupOperationNotice?
+    @Published private(set) var testNotices: [AgentKind: SetupOperationNotice] = [:]
 
     private let defaults: UserDefaults
     private let inspectionProvider: InspectionProvider
@@ -230,7 +243,9 @@ final class SetupWorkflow: ObservableObject {
             return
         }
 
-        if let snapshot, case .translocated = snapshot.application {
+        if operation.changesFiles,
+           let snapshot,
+           case .translocated = snapshot.application {
             notice = SetupOperationNotice(
                 kind: .failure,
                 message: "Setup changes are unavailable while the app is translocated.",
@@ -241,6 +256,9 @@ final class SetupWorkflow: ObservableObject {
 
         activeOperation = operation
         notice = nil
+        if case .test(let agent) = operation {
+            testNotices[agent] = nil
+        }
         await Task.yield()
         do {
             let report = try await operationExecutor(operation)
@@ -263,6 +281,9 @@ final class SetupWorkflow: ObservableObject {
             )
         }
         activeOperation = nil
+        if case .test(let agent) = operation {
+            testNotices[agent] = notice
+        }
         await refresh()
     }
 
@@ -329,6 +350,22 @@ struct SetupMutationExecutor {
                 return SetupOperationReport(
                     message: "\(agent.displayName) was repaired successfully."
                 )
+            case .test(let agent):
+                do {
+                    let runner = BridgeSelfTestRunner(
+                        executableURL: bridge.paths.installedExecutable,
+                        configurationURL: bridge.paths.configuration
+                    )
+                    _ = try await runner.run(integration: agent.rawValue)
+                    return SetupOperationReport(
+                        message: "\(agent.displayName) delivered a correlated test event successfully."
+                    )
+                } catch let failure as BridgeSelfTestFailure {
+                    throw SetupOperationFailure(
+                        message: failure.localizedDescription,
+                        recovery: failure.recovery
+                    )
+                }
             case .remove(let agent):
                 try applyIntegration(
                     agent: agent,

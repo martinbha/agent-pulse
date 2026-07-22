@@ -22,6 +22,7 @@ let package = Package(
         ),
         .target(
             name: "AgentPulseCore",
+            dependencies: ["AgentPulseBridgeSupport"],
             path: "Sources/AgentPulseCore",
             exclude: ["Resources"],
             swiftSettings: swift5Mode

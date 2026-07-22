@@ -1,4 +1,5 @@
 import Foundation
+import AgentPulseBridgeSupport
 
 @MainActor
 final class AgentPulseRuntime: ObservableObject {
@@ -15,6 +16,7 @@ final class AgentPulseRuntime: ObservableObject {
     private let notificationService: AgentNotificationService
     private var server: LocalEventServer?
     private var timer: Timer?
+    private var latestSelfTestReceipt: BridgeSelfTestReceipt?
 
     var endpoint: String {
         "http://127.0.0.1:\(settings.port)"
@@ -105,7 +107,7 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     func copyStateJSON() {
-        let response = ServerStateResponse(store: store)
+        let response = ServerStateResponse(store: store, selfTest: latestSelfTestReceipt)
         if let data = try? AgentPulseJSON.encoder.encode(response),
            let value = String(data: data, encoding: .utf8) {
             Pasteboard.copy(value)
@@ -137,9 +139,12 @@ final class AgentPulseRuntime: ObservableObject {
                     self?.ingest(event)
                 }
             },
-            stateProvider: { [weak store] in
+            stateProvider: { [weak self] in
                 await MainActor.run {
-                    ServerStateResponse(store: store)
+                    ServerStateResponse(
+                        store: self?.store,
+                        selfTest: self?.latestSelfTestReceipt
+                    )
                 }
             },
             clearHandler: { [weak store] in
@@ -159,6 +164,11 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     private func ingest(_ event: AgentEvent) {
+        if let receipt = BridgeSelfTestEventReceipt.make(from: event) {
+            latestSelfTestReceipt = receipt
+            return
+        }
+
         let previousSnapshot = store.snapshots[event.agent] ?? .idle(agent: event.agent)
         let previousState = store.effectiveState(for: previousSnapshot)
 
@@ -174,5 +184,27 @@ final class AgentPulseRuntime: ObservableObject {
             newSnapshot: newSnapshot,
             newState: store.effectiveState(for: newSnapshot)
         )
+    }
+}
+
+enum BridgeSelfTestEventReceipt {
+    static func make(from event: AgentEvent) -> BridgeSelfTestReceipt? {
+        guard let identifier = BridgeSelfTestProtocol.identifier(from: event.sessionID) else {
+            return nil
+        }
+
+        return BridgeSelfTestReceipt(
+            identifier: identifier,
+            integration: event.agent.rawValue,
+            source: event.source ?? "",
+            event: event.event,
+            timestamp: event.timestamp.map(formatTimestamp) ?? ""
+        )
+    }
+
+    private static func formatTimestamp(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 }

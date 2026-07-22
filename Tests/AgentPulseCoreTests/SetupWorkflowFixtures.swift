@@ -46,6 +46,13 @@ struct SetupFailureSnapshot {
     var recovery: String
 }
 
+struct SetupSelfTestSnapshot {
+    var executed: [SetupOperation]
+    var inspectionCount: Int
+    var noticeKind: SetupOperationNotice.Kind?
+    var noticeMessage: String?
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -231,6 +238,31 @@ enum SetupWorkflowFixtures {
             noticeRecovery: workflow.notice?.recovery,
             isOperationComplete: workflow.activeOperation == nil,
             hasSeenWelcome: workflow.hasSeenWelcome
+        )
+    }
+
+    @MainActor
+    static func successfulSelfTest() async -> SetupSelfTestSnapshot {
+        var inspectionCount = 0
+        var executed: [SetupOperation] = []
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                inspectionCount += 1
+                return makeSnapshot()
+            },
+            operationExecutor: { operation in
+                executed.append(operation)
+                return SetupOperationReport(message: "Delivery verified")
+            }
+        )
+
+        await workflow.perform(.test(.codex))
+        return SetupSelfTestSnapshot(
+            executed: executed,
+            inspectionCount: inspectionCount,
+            noticeKind: workflow.testNotices[.codex]?.kind,
+            noticeMessage: workflow.testNotices[.codex]?.message
         )
     }
 
