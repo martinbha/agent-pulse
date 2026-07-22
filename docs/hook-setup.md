@@ -2,6 +2,15 @@
 
 Agent Pulse receives events from Claude Code and Codex through a small native bridge.
 
+For normal installation, open **Setup** from the Agent Pulse menu and select
+**Set Up** on each tool you want to connect. Agent Pulse installs the bridge,
+backs up an existing configuration before changing it, preserves unrelated
+settings, and refreshes the displayed health after each operation. No manual
+configuration editing is required.
+
+The details below are a development and troubleshooting reference for the
+files managed by Setup.
+
 The app writes local connection details to:
 
 ```text
@@ -14,7 +23,7 @@ The bridge reads that file, normalizes hook payloads, and sends events to:
 http://127.0.0.1:37462/v1/events
 ```
 
-## Install the native bridge
+## Manual bridge installation reference
 
 From this repository:
 

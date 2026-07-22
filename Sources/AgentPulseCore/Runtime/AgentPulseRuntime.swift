@@ -8,6 +8,7 @@ final class AgentPulseRuntime: ObservableObject {
     let appearance: AppearanceSettings
     let hotkeySettings: HotkeySettings
     let appLauncher = AgentAppLauncher()
+    lazy var setup = SetupWorkflow.live(runtime: self)
 
     @Published private(set) var serverStatus = "Starting local server..."
 

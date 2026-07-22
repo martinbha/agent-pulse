@@ -5,6 +5,7 @@ struct AgentPulseConfigView: View {
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
     @ObservedObject var hotkeySettings: HotkeySettings
+    var openSetup: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -12,7 +13,20 @@ struct AgentPulseConfigView: View {
 
             Divider()
 
-            SettingsSummary(runtime: runtime)
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Integrations")
+                        .agentPulseFont(size: 15)
+                    Text("Install, repair, or remove local tool connections.")
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Open Setup") {
+                    openSetup()
+                }
+            }
 
             Divider()
 
@@ -83,17 +97,6 @@ struct AgentPulseConfigView: View {
                 }
             }
 
-            Divider()
-
-            HStack {
-                Button {
-                    runtime.copyStateJSON()
-                } label: {
-                    Label("Copy State", systemImage: "doc.on.doc")
-                }
-
-                Spacer()
-            }
         }
         .padding(20)
         .frame(width: 460)
@@ -102,7 +105,7 @@ struct AgentPulseConfigView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Agent Pulse Config")
+            Text("Agent Pulse Settings")
                 .agentPulseFont(size: 20)
             Text(runtime.serverStatus)
                 .agentPulseFont(size: 13)
