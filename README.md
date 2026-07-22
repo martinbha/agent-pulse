@@ -18,8 +18,10 @@ logins to fetch usage — combining them into a quiet ambient indicator.
 - **Dropdown** — click a pill for per-agent **5h** and **weekly** usage bars with
   reset times, the project and last event, a last-updated time, and a manual
   refresh button.
-- **Config** — customizable Claude and Codex brand colors, usage refresh
-  interval controls, and manual test events.
+- **Setup** — guided installation, repair, and removal of Claude Code and Codex
+  integrations, with health and last-event status for each tool.
+- **Settings** — customizable Claude and Codex brand colors, usage refresh
+  interval controls, shortcut configuration, and manual preview events.
 
 Usage is fetched from your existing Claude and Codex logins with no separate
 sign-in, and Claude Desktop auth state is read-only. See
@@ -28,8 +30,8 @@ expected Keychain prompts, and privacy details.
 
 ## Install from source
 
-Agent Pulse currently supports macOS 14 and newer. Until in-app integration
-setup and Homebrew distribution are available, installation requires:
+Agent Pulse currently supports macOS 14 and newer. Until Homebrew distribution
+is available, building from source requires:
 
 - Apple Command Line Tools with Swift 6 (`xcode-select --install`)
 - Git
@@ -46,8 +48,10 @@ open "$HOME/Applications/Agent Pulse.app"
 ```
 
 This source-built bundle is signed locally rather than notarized for download.
-After starting the app once, continue with
-[work-status hook setup](docs/hook-setup.md).
+On first launch, Agent Pulse opens Setup automatically. Each detected tool has
+its own status card; choose **Set Up** to install the local bridge and configure
+that tool without editing files or running additional shell commands. Setup is
+always available later from the menu-bar dropdown or Settings.
 
 ## Development
 
@@ -80,7 +84,7 @@ open "dist/Agent Pulse.app"
 
 ## Documentation
 
-- [Work-status hooks](docs/hook-setup.md) — wire Claude Code and Codex hook
-  events to Agent Pulse via the native bridge.
+- [Work-status hooks](docs/hook-setup.md) — integration behavior, managed files,
+  and a manual reference for development and troubleshooting.
 - [Usage tracking](docs/usage-tracking.md) — how 5h and weekly usage are read,
   the authentication sources, Keychain prompts, and privacy.
