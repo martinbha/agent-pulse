@@ -5,6 +5,7 @@ struct AgentPulseConfigView: View {
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
     @ObservedObject var hotkeySettings: HotkeySettings
+    @ObservedObject var setup: SetupWorkflow
     var openSetup: () -> Void
 
     var body: some View {
@@ -53,7 +54,43 @@ struct AgentPulseConfigView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Test Events")
+                Text("Delivery Self-Test")
+                    .agentPulseFont(size: 15)
+
+                Text("Runs the installed bridge through the authenticated local server without changing agent status or sending a notification.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    deliveryTestButton(.claude)
+                    deliveryTestButton(.codex)
+                    Spacer()
+                }
+
+                ForEach(AgentKind.allCases) { agent in
+                    if let notice = setup.testNotices[agent] {
+                        Label(
+                            notice.message,
+                            systemImage: notice.kind == .success
+                                ? "checkmark.circle.fill"
+                                : "xmark.octagon.fill"
+                        )
+                        .foregroundStyle(notice.kind == .success ? .green : .red)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                        if let recovery = notice.recovery {
+                            Text(recovery)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Preview Events")
                     .agentPulseFont(size: 15)
 
                 VStack(spacing: 8) {
@@ -101,6 +138,49 @@ struct AgentPulseConfigView: View {
         .padding(20)
         .frame(width: 460)
         .agentPulseFont(size: 13)
+        .task {
+            if setup.snapshot == nil {
+                await setup.refresh()
+            }
+        }
+    }
+
+    private func deliveryTestButton(_ agent: AgentKind) -> some View {
+        Button {
+            Task { await setup.perform(.test(agent)) }
+        } label: {
+            if setup.activeOperation == .test(agent) {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Testing \(agent.displayName)")
+                }
+            } else {
+                Label(
+                    "Test \(agent.displayName)",
+                    systemImage: "point.3.connected.trianglepath.dotted"
+                )
+            }
+        }
+        .disabled(
+            setup.activeOperation != nil
+                || setup.isRefreshing
+                || !isConfigured(agent)
+        )
+        .help(
+            isConfigured(agent)
+                ? "Run the installed bridge delivery test."
+                : "Set up this integration before testing delivery."
+        )
+    }
+
+    private func isConfigured(_ agent: AgentKind) -> Bool {
+        guard let integration = setup.snapshot?.integrations.first(where: {
+            $0.agent == agent
+        }) else {
+            return false
+        }
+        return SetupIntegrationOperations.canTest(integration)
     }
 
     private var header: some View {

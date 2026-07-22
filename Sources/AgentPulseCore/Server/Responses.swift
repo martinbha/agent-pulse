@@ -1,4 +1,5 @@
 import Foundation
+import AgentPulseBridgeSupport
 
 struct OKResponse: Codable {
     var ok: Bool
@@ -42,10 +43,18 @@ struct AgentStateResponse: Codable {
 struct ServerStateResponse: Codable {
     var ok: Bool
     var agents: [AgentStateResponse]
+    var selfTest: BridgeSelfTestReceipt?
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case agents
+        case selfTest = "self_test"
+    }
 
     @MainActor
-    init(store: AgentStatusStore?) {
+    init(store: AgentStatusStore?, selfTest: BridgeSelfTestReceipt? = nil) {
         self.ok = true
+        self.selfTest = selfTest
         self.agents = store?.orderedSnapshots.map { snapshot in
             AgentStateResponse(
                 agent: snapshot.agent,
@@ -61,4 +70,3 @@ struct ServerStateResponse: Codable {
         } ?? []
     }
 }
-

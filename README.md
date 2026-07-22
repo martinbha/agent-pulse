@@ -50,8 +50,10 @@ open "$HOME/Applications/Agent Pulse.app"
 This source-built bundle is signed locally rather than notarized for download.
 On first launch, Agent Pulse opens Setup automatically. Each detected tool has
 its own status card; choose **Set Up** to install the local bridge and configure
-that tool without editing files or running additional shell commands. Setup is
-always available later from the menu-bar dropdown or Settings.
+that tool without editing files or running additional shell commands. Choose
+**Test** afterward to verify correlated delivery without changing the normal
+agent status or sending an event notification. Setup is always available later
+from the menu-bar dropdown or Settings.
 
 ## Development
 

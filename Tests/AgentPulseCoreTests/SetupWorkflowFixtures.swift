@@ -19,6 +19,8 @@ struct SetupIntegrationOperationsSnapshot {
     var outdated: [SetupOperation]
     var invalid: [SetupOperation]
     var unavailable: [SetupOperation]
+    var currentCanTest: Bool
+    var missingCanTest: Bool
 }
 
 struct SetupIntegrationStatesSnapshot {
@@ -44,6 +46,13 @@ struct SetupMutationSnapshot {
 struct SetupFailureSnapshot {
     var message: String
     var recovery: String
+}
+
+struct SetupSelfTestSnapshot {
+    var executed: [SetupOperation]
+    var inspectionCount: Int
+    var noticeKind: SetupOperationNotice.Kind?
+    var noticeMessage: String?
 }
 
 enum SetupWorkflowFixtures {
@@ -109,13 +118,11 @@ enum SetupWorkflowFixtures {
         let available: IntegrationHostHealth = .available(
             location: URL(fileURLWithPath: "/usr/local/bin/tool")
         )
+        let missing = integration(host: available, hooks: .missing)
+        let current = integration(host: available, hooks: .current)
         return SetupIntegrationOperationsSnapshot(
-            missing: SetupIntegrationOperations.available(
-                for: integration(host: available, hooks: .missing)
-            ),
-            current: SetupIntegrationOperations.available(
-                for: integration(host: available, hooks: .current)
-            ),
+            missing: SetupIntegrationOperations.available(for: missing),
+            current: SetupIntegrationOperations.available(for: current),
             outdated: SetupIntegrationOperations.available(
                 for: integration(host: available, hooks: .outdated)
             ),
@@ -124,7 +131,9 @@ enum SetupWorkflowFixtures {
             ),
             unavailable: SetupIntegrationOperations.available(
                 for: integration(host: .unavailable, hooks: .missing)
-            )
+            ),
+            currentCanTest: SetupIntegrationOperations.canTest(current),
+            missingCanTest: SetupIntegrationOperations.canTest(missing)
         )
     }
 
@@ -231,6 +240,31 @@ enum SetupWorkflowFixtures {
             noticeRecovery: workflow.notice?.recovery,
             isOperationComplete: workflow.activeOperation == nil,
             hasSeenWelcome: workflow.hasSeenWelcome
+        )
+    }
+
+    @MainActor
+    static func successfulSelfTest() async -> SetupSelfTestSnapshot {
+        var inspectionCount = 0
+        var executed: [SetupOperation] = []
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                inspectionCount += 1
+                return makeSnapshot()
+            },
+            operationExecutor: { operation in
+                executed.append(operation)
+                return SetupOperationReport(message: "Delivery verified")
+            }
+        )
+
+        await workflow.perform(.test(.codex))
+        return SetupSelfTestSnapshot(
+            executed: executed,
+            inspectionCount: inspectionCount,
+            noticeKind: workflow.testNotices[.codex]?.kind,
+            noticeMessage: workflow.testNotices[.codex]?.message
         )
     }
 

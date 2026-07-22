@@ -9,8 +9,8 @@ enum AgentPulseBridgeCommand {
             await deliver(agent: agent)
         case .version:
             print(BridgeVersion.current())
-        case .doctor:
-            exit(await runDoctor())
+        case .doctor(let agent):
+            exit(await runDoctor(agent: agent))
         case .none:
             break
         }
@@ -46,7 +46,7 @@ enum AgentPulseBridgeCommand {
         }
     }
 
-    private static func runDoctor() async -> Int32 {
+    private static func runDoctor(agent requestedAgent: String?) async -> Int32 {
         print("Bridge version: \(BridgeVersion.current())")
 
         do {
@@ -56,6 +56,21 @@ enum AgentPulseBridgeCommand {
             let request = try BridgeRequestFactory.makeStateRequest(configuration: configuration)
             try await BridgeHTTPClient().send(request)
             print("Local server and authorization: OK")
+
+            let integrations = requestedAgent.map { [$0] } ?? ["claude", "codex"]
+            let runner = BridgeSelfTestRunner(
+                executableURL: URL(fileURLWithPath: CommandLine.arguments[0])
+            )
+            for integration in integrations {
+                do {
+                    _ = try await runner.run(integration: integration)
+                    print("Delivery self-test (\(integration)): OK")
+                } catch let failure as BridgeSelfTestFailure {
+                    print("Delivery self-test (\(integration)) failed at \(failure.stage.rawValue): \(failure.message)")
+                    print("Recovery: \(failure.recovery)")
+                    return BridgeDoctorExitCode.forSelfTestFailure(failure)
+                }
+            }
             return 0
         } catch {
             print("Doctor failed: \(BridgeDiagnosticMessage.describe(error))")

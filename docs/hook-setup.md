@@ -8,6 +8,12 @@ backs up an existing configuration before changing it, preserves unrelated
 settings, and refreshes the displayed health after each operation. No manual
 configuration editing is required.
 
+After setup, select **Test** on an integration card to run the installed bridge
+with a uniquely correlated event. The app verifies delivery through its
+authenticated local state endpoint, reports the exact failing stage when the
+test does not pass, and refreshes setup health afterward. Self-test events do
+not change the displayed agent state or produce normal event notifications.
+
 The details below are a development and troubleshooting reference for the
 files managed by Setup.
 
@@ -205,18 +211,22 @@ statusMessage = "Updating Agent Pulse"
 The TOML integration supports only the six event tables shown above. Agent
 Pulse owns the marker-delimited block and leaves all other TOML content intact.
 
-## Manual test
+## Delivery diagnostics
 
-With Agent Pulse running, execute this from any project directory:
-
-```bash
-printf '{"hook_event_name":"UserPromptSubmit"}' \
-  | "$HOME/.agent-pulse/bin/agent-pulse-hook" codex
-```
-
-Then query state:
+The **Test** button in Setup or Settings is the preferred delivery check. For a
+terminal-based diagnostic, keep Agent Pulse running and execute:
 
 ```bash
-TOKEN="$(plutil -extract token raw "$HOME/.agent-pulse/config.json")"
-curl http://127.0.0.1:37462/v1/state -H "Authorization: Bearer $TOKEN"
+"$HOME/.agent-pulse/bin/agent-pulse-hook" --doctor
 ```
+
+Pass one integration name to limit the correlated delivery test:
+
+```bash
+"$HOME/.agent-pulse/bin/agent-pulse-hook" --doctor claude
+"$HOME/.agent-pulse/bin/agent-pulse-hook" --doctor codex
+```
+
+The command checks bridge configuration, local connectivity and authorization,
+then verifies that each requested correlated event appears in local state. It
+prints a failure stage and recovery step without displaying the bearer token.

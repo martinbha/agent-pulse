@@ -6,7 +6,9 @@ import Testing
     @Test func parsesCommands() {
         #expect(BridgeCommand.parse([]) == .none)
         #expect(BridgeCommand.parse(["--version"]) == .version)
-        #expect(BridgeCommand.parse(["--doctor"]) == .doctor)
+        #expect(BridgeCommand.parse(["--doctor"]) == .doctor(agent: nil))
+        #expect(BridgeCommand.parse(["--doctor", "claude"]) == .doctor(agent: "claude"))
+        #expect(BridgeCommand.parse(["--doctor", "unknown"]) == .none)
         #expect(BridgeCommand.parse(["--unknown"]) == .none)
         #expect(BridgeCommand.parse(["unknown"]) == .none)
         #expect(BridgeCommand.parse(["claude"]) == .hook(agent: "claude"))

@@ -77,7 +77,12 @@ public struct BridgeHTTPClient: Sendable {
     }
 
     public func send(_ request: URLRequest) async throws {
-        let (_, response) = try await session.data(for: request)
+        _ = try await data(for: request)
+    }
+
+    public func data(for request: URLRequest) async throws -> Data {
+        let (data, response) = try await session.data(for: request)
         try BridgeResponseValidator.validate(response)
+        return data
     }
 }
