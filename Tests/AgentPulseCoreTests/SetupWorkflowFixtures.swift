@@ -21,6 +21,16 @@ struct SetupIntegrationOperationsSnapshot {
     var unavailable: [SetupOperation]
 }
 
+struct SetupIntegrationStatesSnapshot {
+    var connected: SetupIntegrationState
+    var waitingForEvent: SetupIntegrationState
+    var bridgeUnavailable: SetupIntegrationState
+    var hostUnavailable: SetupIntegrationState
+    var missing: SetupIntegrationState
+    var outdated: SetupIntegrationState
+    var invalid: SetupIntegrationState
+}
+
 struct SetupMutationSnapshot {
     var executed: [SetupOperation]
     var inspectionCount: Int
@@ -114,6 +124,52 @@ enum SetupWorkflowFixtures {
             ),
             unavailable: SetupIntegrationOperations.available(
                 for: integration(host: .unavailable, hooks: .missing)
+            )
+        )
+    }
+
+    static func integrationStates() -> SetupIntegrationStatesSnapshot {
+        let available: IntegrationHostHealth = .available(
+            location: URL(fileURLWithPath: "/usr/local/bin/tool")
+        )
+        let current = integration(
+            host: available,
+            hooks: .current,
+            lastEvent: .received(
+                event: "Stop",
+                timestamp: Date(timeIntervalSince1970: 1_800_000_000),
+                age: 10
+            )
+        )
+        let waiting = integration(host: available, hooks: .current)
+        return SetupIntegrationStatesSnapshot(
+            connected: SetupIntegrationStateResolver.state(
+                for: current,
+                bridge: .current(version: "1.0.0")
+            ),
+            waitingForEvent: SetupIntegrationStateResolver.state(
+                for: waiting,
+                bridge: .current(version: "1.0.0")
+            ),
+            bridgeUnavailable: SetupIntegrationStateResolver.state(
+                for: current,
+                bridge: .missing
+            ),
+            hostUnavailable: SetupIntegrationStateResolver.state(
+                for: integration(host: .unavailable, hooks: .current),
+                bridge: .current(version: "1.0.0")
+            ),
+            missing: SetupIntegrationStateResolver.state(
+                for: integration(host: available, hooks: .missing),
+                bridge: .missing
+            ),
+            outdated: SetupIntegrationStateResolver.state(
+                for: integration(host: available, hooks: .outdated),
+                bridge: .missing
+            ),
+            invalid: SetupIntegrationStateResolver.state(
+                for: integration(host: available, hooks: .invalid("Malformed")),
+                bridge: .missing
             )
         )
     }
@@ -293,14 +349,15 @@ enum SetupWorkflowFixtures {
 
     private static func integration(
         host: IntegrationHostHealth,
-        hooks: HookConfigurationHealth
+        hooks: HookConfigurationHealth,
+        lastEvent: LastIntegrationEventHealth = .never
     ) -> IntegrationHealthSnapshot {
         IntegrationHealthSnapshot(
             agent: .claude,
             host: host,
             hooks: hooks,
             usage: .available,
-            lastEvent: .never,
+            lastEvent: lastEvent,
             recommendedAction: .none
         )
     }

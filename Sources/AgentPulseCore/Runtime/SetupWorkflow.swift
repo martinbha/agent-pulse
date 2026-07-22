@@ -107,6 +107,45 @@ enum SetupIntegrationOperations {
     }
 }
 
+enum SetupIntegrationState: Equatable {
+    case connected
+    case waitingForEvent
+    case bridgeUnavailable
+    case hostUnavailable
+    case notSetUp
+    case needsRepair
+    case needsReview
+}
+
+enum SetupIntegrationStateResolver {
+    static func state(
+        for integration: IntegrationHealthSnapshot,
+        bridge: BridgeHealth
+    ) -> SetupIntegrationState {
+        switch integration.hooks {
+        case .invalid:
+            return .needsReview
+        case .outdated, .duplicated:
+            return .needsRepair
+        case .missing:
+            return .notSetUp
+        case .current:
+            break
+        }
+
+        guard case .current = bridge else {
+            return .bridgeUnavailable
+        }
+        guard case .available = integration.host else {
+            return .hostUnavailable
+        }
+        if case .never = integration.lastEvent {
+            return .waitingForEvent
+        }
+        return .connected
+    }
+}
+
 @MainActor
 final class SetupWorkflow: ObservableObject {
     typealias InspectionProvider = () async -> SetupHealthSnapshot
@@ -202,6 +241,7 @@ final class SetupWorkflow: ObservableObject {
 
         activeOperation = operation
         notice = nil
+        await Task.yield()
         do {
             let report = try await operationExecutor(operation)
             notice = SetupOperationNotice(

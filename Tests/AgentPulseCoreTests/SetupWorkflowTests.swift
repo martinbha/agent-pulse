@@ -26,6 +26,18 @@ import Testing
         #expect(snapshot.unavailable.isEmpty)
     }
 
+    @Test func integrationStateRequiresBridgeHostAndAReceivedEvent() {
+        let snapshot = SetupWorkflowFixtures.integrationStates()
+
+        #expect(snapshot.connected == .connected)
+        #expect(snapshot.waitingForEvent == .waitingForEvent)
+        #expect(snapshot.bridgeUnavailable == .bridgeUnavailable)
+        #expect(snapshot.hostUnavailable == .hostUnavailable)
+        #expect(snapshot.missing == .notSetUp)
+        #expect(snapshot.outdated == .needsRepair)
+        #expect(snapshot.invalid == .needsReview)
+    }
+
     @Test @MainActor func welcomeStatePersistsAndSuccessfulMutationRefreshesHealth() async {
         let snapshot = await SetupWorkflowFixtures.successfulMutation()
 

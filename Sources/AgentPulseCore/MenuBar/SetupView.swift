@@ -4,6 +4,8 @@ import SwiftUI
 struct SetupView: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var workflow: SetupWorkflow
+    @State private var pendingRemovalAgent: AgentKind?
+    @State private var isConfirmingTokenRotation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +30,7 @@ struct SetupView: View {
                             ForEach(snapshot.integrations) { integration in
                                 integrationCard(
                                     integration,
+                                    bridge: snapshot.bridge,
                                     mutationsBlocked: isTranslocated(snapshot.application)
                                 )
                             }
@@ -45,6 +48,29 @@ struct SetupView: View {
         .agentPulseFont(size: 13)
         .task {
             await workflow.refresh()
+        }
+        .confirmationDialog(
+            "Remove this integration?",
+            isPresented: Binding(
+                get: { pendingRemovalAgent != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingRemovalAgent = nil
+                    }
+                }
+            )
+        ) {
+            if let agent = pendingRemovalAgent {
+                Button("Remove \(agent.displayName) Integration", role: .destructive) {
+                    pendingRemovalAgent = nil
+                    Task { await workflow.perform(.remove(agent)) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingRemovalAgent = nil
+            }
+        } message: {
+            Text("Only Agent Pulse-owned hooks will be removed. The existing configuration is backed up before it changes.")
         }
     }
 
@@ -149,6 +175,7 @@ struct SetupView: View {
 
     private func integrationCard(
         _ integration: IntegrationHealthSnapshot,
+        bridge: BridgeHealth,
         mutationsBlocked: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -160,8 +187,8 @@ struct SetupView: View {
                     .agentPulseFont(size: 16)
                 Spacer()
                 statusBadge(
-                    integrationStatusLabel(integration),
-                    tone: integrationTone(integration)
+                    integrationStatusLabel(integration, bridge: bridge),
+                    tone: integrationTone(integration, bridge: bridge)
                 )
             }
 
@@ -236,9 +263,20 @@ struct SetupView: View {
                     Spacer()
 
                     Button(role: .destructive) {
-                        runtime.regenerateToken()
+                        isConfirmingTokenRotation = true
                     } label: {
                         Label("Rotate Token", systemImage: "arrow.clockwise")
+                    }
+                    .confirmationDialog(
+                        "Rotate the bearer token?",
+                        isPresented: $isConfirmingTokenRotation
+                    ) {
+                        Button("Rotate Token", role: .destructive) {
+                            runtime.regenerateToken()
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("The bridge configuration updates immediately. Any previously copied token will stop working.")
                     }
                 }
 
@@ -342,11 +380,12 @@ struct SetupView: View {
             Button("Quit Agent Pulse") {
                 NSApplication.shared.terminate(nil)
             }
-        case .installHost(let agent), .signIn(let agent):
+        case .signIn(let agent):
             Button("Open \(agent.displayName)") {
                 Task { _ = await runtime.appLauncher.open(agent) }
             }
-        case .installIntegration,
+        case .installHost,
+             .installIntegration,
              .repairIntegration,
              .testIntegration,
              .requestNotificationPermission,
@@ -359,7 +398,11 @@ struct SetupView: View {
 
     private func operationButton(_ operation: SetupOperation) -> some View {
         Button(role: isRemoval(operation) ? .destructive : nil) {
-            Task { await workflow.perform(operation) }
+            if case .remove(let agent) = operation {
+                pendingRemovalAgent = agent
+            } else {
+                Task { await workflow.perform(operation) }
+            }
         } label: {
             if workflow.activeOperation == operation {
                 HStack(spacing: 6) {
@@ -447,22 +490,30 @@ struct SetupView: View {
         }
     }
 
-    private func integrationStatusLabel(_ integration: IntegrationHealthSnapshot) -> String {
-        switch integration.hooks {
-        case .current: return "Connected"
-        case .missing: return "Not set up"
-        case .outdated: return "Needs repair"
-        case .duplicated: return "Needs repair"
-        case .invalid: return "Needs review"
+    private func integrationStatusLabel(
+        _ integration: IntegrationHealthSnapshot,
+        bridge: BridgeHealth
+    ) -> String {
+        switch SetupIntegrationStateResolver.state(for: integration, bridge: bridge) {
+        case .connected: return "Connected"
+        case .waitingForEvent: return "Waiting for event"
+        case .bridgeUnavailable: return "Bridge unavailable"
+        case .hostUnavailable: return "Tool not found"
+        case .notSetUp: return "Not set up"
+        case .needsRepair: return "Needs repair"
+        case .needsReview: return "Needs review"
         }
     }
 
-    private func integrationTone(_ integration: IntegrationHealthSnapshot) -> SetupTone {
-        switch integration.hooks {
-        case .current: return .good
-        case .missing: return .neutral
-        case .outdated, .duplicated: return .warning
-        case .invalid: return .bad
+    private func integrationTone(
+        _ integration: IntegrationHealthSnapshot,
+        bridge: BridgeHealth
+    ) -> SetupTone {
+        switch SetupIntegrationStateResolver.state(for: integration, bridge: bridge) {
+        case .connected: return .good
+        case .waitingForEvent, .notSetUp, .hostUnavailable: return .neutral
+        case .bridgeUnavailable, .needsRepair: return .warning
+        case .needsReview: return .bad
         }
     }
 
