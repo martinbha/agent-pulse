@@ -11,6 +11,7 @@ final class StatusItemController: NSObject {
     private var popoverPanel: AnchoredPopoverPanel?
     private var popoverHostingController: NSHostingController<AnyView>?
     private var configWindowController: NSWindowController?
+    private var setupWindowController: NSWindowController?
     private var pinnedPanel: PinnedOverlayPanel?
     private var pinnedHostingController: NSHostingController<AnyView>?
     private var hotKey: GlobalHotKey?
@@ -33,6 +34,7 @@ final class StatusItemController: NSObject {
         configureHotKey()
         bindUpdates()
         updateStatusItem()
+        presentSetupIfNeeded()
     }
 
     deinit {
@@ -104,6 +106,9 @@ final class StatusItemController: NSObject {
             usageStore: runtime.usageStore,
             appearance: runtime.appearance,
             appLauncher: runtime.appLauncher,
+            openSetup: { [weak self] in
+                self?.showSetupWindow()
+            },
             openConfig: { [weak self] in
                 self?.showConfigWindow()
             },
@@ -430,7 +435,10 @@ final class StatusItemController: NSObject {
                 runtime: runtime,
                 usageStore: runtime.usageStore,
                 appearance: runtime.appearance,
-                hotkeySettings: runtime.hotkeySettings
+                hotkeySettings: runtime.hotkeySettings,
+                openSetup: { [weak self] in
+                    self?.showSetupWindow()
+                }
             )
         )
         let window = NSWindow(
@@ -442,10 +450,57 @@ final class StatusItemController: NSObject {
         window.center()
         window.contentViewController = hostingController
         window.isReleasedWhenClosed = false
-        window.title = "Agent Pulse Config"
+        window.title = "Agent Pulse Settings"
 
         let controller = NSWindowController(window: window)
         configWindowController = controller
+        controller.showWindow(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    private func presentSetupIfNeeded() {
+        Task { [weak self] in
+            guard let self, await self.runtime.setup.prepareForLaunch() else {
+                return
+            }
+            self.showSetupWindow(shouldRefresh: false)
+        }
+    }
+
+    private func showSetupWindow(shouldRefresh: Bool = true) {
+        closePopover()
+        runtime.setup.markWelcomeSeen()
+
+        if shouldRefresh {
+            Task { [weak runtime] in
+                await runtime?.setup.refresh()
+            }
+        }
+
+        if let window = setupWindowController?.window {
+            window.makeKeyAndOrderFront(nil)
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hostingController = NSHostingController(
+            rootView: SetupView(runtime: runtime, workflow: runtime.setup)
+        )
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 640),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 640, height: 540)
+        window.title = "Agent Pulse Setup"
+        window.collectionBehavior = [.moveToActiveSpace]
+
+        let controller = NSWindowController(window: window)
+        setupWindowController = controller
         controller.showWindow(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
