@@ -55,4 +55,11 @@ import Testing
         #expect(snapshot.noticeKind == .failure)
         #expect(snapshot.noticeRecovery?.contains("/Applications") == true)
     }
+
+    @Test @MainActor func bridgeFailureIncludesAConcreteRecoveryStep() async throws {
+        let snapshot = try await SetupWorkflowFixtures.missingBundledBridgeFailure()
+
+        #expect(snapshot.message.contains("version is missing or invalid"))
+        #expect(snapshot.recovery.contains("complete Agent Pulse app bundle"))
+    }
 }

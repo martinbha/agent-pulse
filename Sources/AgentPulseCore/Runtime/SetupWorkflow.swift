@@ -262,22 +262,32 @@ struct SetupMutationExecutor {
         return SetupMutationExecutor { operation in
             switch operation {
             case .installBridge:
-                _ = try bridge.install()
+                try installBridge(using: bridge)
                 return SetupOperationReport(message: "The local bridge is installed and ready.")
             case .repairBridge:
-                _ = try bridge.repair()
+                try repairBridge(using: bridge)
                 return SetupOperationReport(message: "The local bridge was repaired successfully.")
-            case .setUp(let agent), .repair(let agent):
-                _ = try bridge.install()
+            case .setUp(let agent):
+                try installBridge(using: bridge)
                 try applyIntegration(
                     agent: agent,
                     operation: .install,
                     json: json,
                     toml: toml
                 )
-                let verb = operation.title == "Repair" ? "repaired" : "set up"
                 return SetupOperationReport(
-                    message: "\(agent.displayName) was \(verb) successfully."
+                    message: "\(agent.displayName) was set up successfully."
+                )
+            case .repair(let agent):
+                try repairBridge(using: bridge)
+                try applyIntegration(
+                    agent: agent,
+                    operation: .install,
+                    json: json,
+                    toml: toml
+                )
+                return SetupOperationReport(
+                    message: "\(agent.displayName) was repaired successfully."
                 )
             case .remove(let agent):
                 try applyIntegration(
@@ -296,6 +306,48 @@ struct SetupMutationExecutor {
     private enum IntegrationMutation {
         case install
         case remove
+    }
+
+    private static func installBridge(using bridge: BridgeInstaller) throws {
+        do {
+            _ = try bridge.install()
+        } catch let error as BridgeInstallationError {
+            throw bridgeFailure(error)
+        }
+    }
+
+    private static func repairBridge(using bridge: BridgeInstaller) throws {
+        do {
+            _ = try bridge.repair()
+        } catch let error as BridgeInstallationError {
+            throw bridgeFailure(error)
+        }
+    }
+
+    private static func bridgeFailure(
+        _ error: BridgeInstallationError
+    ) -> SetupOperationFailure {
+        let message = error.errorDescription ?? "The local bridge could not be changed."
+        let recovery: String
+        switch error {
+        case .appTranslocated:
+            recovery = "Move Agent Pulse to /Applications or ~/Applications, reopen it, and retry."
+        case .bundledExecutableMissing,
+             .bundledExecutableInvalid,
+             .bundledVersionInvalid:
+            recovery = "Reinstall or rebuild the complete Agent Pulse app bundle, then reopen Setup."
+        case .directoryCreationFailed:
+            recovery = "Confirm your home folder is writable and that ~/.agent-pulse is owned by your account, then retry."
+        case .copyFailed:
+            recovery = "Confirm ~/.agent-pulse is writable and has available disk space, then retry."
+        case .permissionUpdateFailed:
+            recovery = "Restore ownership of ~/.agent-pulse to your account, then retry."
+        case .replacementFailed:
+            recovery = "Close other processes using the bridge, confirm ~/.agent-pulse is writable, and retry."
+        case .removalFailed:
+            recovery = "Close other processes using the bridge, confirm ~/.agent-pulse is writable, and retry removal."
+        }
+        return SetupOperationFailure(message: message, recovery: recovery)
     }
 
     private static func applyIntegration(

@@ -31,6 +31,11 @@ struct SetupMutationSnapshot {
     var hasSeenWelcome: Bool
 }
 
+struct SetupFailureSnapshot {
+    var message: String
+    var recovery: String
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -205,6 +210,33 @@ enum SetupWorkflowFixtures {
             isOperationComplete: workflow.activeOperation == nil,
             hasSeenWelcome: workflow.hasSeenWelcome
         )
+    }
+
+    @MainActor
+    static func missingBundledBridgeFailure() async throws -> SetupFailureSnapshot {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("agent-pulse-setup-executor-\(UUID().uuidString)")
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let bundle = root.appendingPathComponent("Agent Pulse.app", isDirectory: true)
+        try fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: bundle, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let executor = SetupMutationExecutor.live(
+            homeDirectory: home,
+            bundleURL: bundle,
+            fileManager: fileManager
+        )
+        do {
+            _ = try await executor.execute(.installBridge)
+            return SetupFailureSnapshot(message: "", recovery: "")
+        } catch let failure as SetupOperationFailure {
+            return SetupFailureSnapshot(
+                message: failure.message,
+                recovery: failure.recovery
+            )
+        }
     }
 
     @MainActor
