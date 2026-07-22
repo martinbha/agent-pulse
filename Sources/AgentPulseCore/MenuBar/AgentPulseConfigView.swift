@@ -138,6 +138,11 @@ struct AgentPulseConfigView: View {
         .padding(20)
         .frame(width: 460)
         .agentPulseFont(size: 13)
+        .task {
+            if setup.snapshot == nil {
+                await setup.refresh()
+            }
+        }
     }
 
     private func deliveryTestButton(_ agent: AgentKind) -> some View {
@@ -157,7 +162,25 @@ struct AgentPulseConfigView: View {
                 )
             }
         }
-        .disabled(setup.activeOperation != nil || setup.isRefreshing)
+        .disabled(
+            setup.activeOperation != nil
+                || setup.isRefreshing
+                || !isConfigured(agent)
+        )
+        .help(
+            isConfigured(agent)
+                ? "Run the installed bridge delivery test."
+                : "Set up this integration before testing delivery."
+        )
+    }
+
+    private func isConfigured(_ agent: AgentKind) -> Bool {
+        guard let integration = setup.snapshot?.integrations.first(where: {
+            $0.agent == agent
+        }) else {
+            return false
+        }
+        return SetupIntegrationOperations.canTest(integration)
     }
 
     private var header: some View {

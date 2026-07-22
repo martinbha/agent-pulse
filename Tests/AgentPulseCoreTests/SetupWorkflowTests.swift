@@ -21,6 +21,8 @@ import Testing
 
         #expect(snapshot.missing == [.setUp(.claude)])
         #expect(snapshot.current == [.test(.claude), .remove(.claude)])
+        #expect(snapshot.currentCanTest)
+        #expect(!snapshot.missingCanTest)
         #expect(snapshot.outdated == [.repair(.claude), .remove(.claude)])
         #expect(snapshot.invalid.isEmpty)
         #expect(snapshot.unavailable.isEmpty)

@@ -19,6 +19,8 @@ struct SetupIntegrationOperationsSnapshot {
     var outdated: [SetupOperation]
     var invalid: [SetupOperation]
     var unavailable: [SetupOperation]
+    var currentCanTest: Bool
+    var missingCanTest: Bool
 }
 
 struct SetupIntegrationStatesSnapshot {
@@ -116,13 +118,11 @@ enum SetupWorkflowFixtures {
         let available: IntegrationHostHealth = .available(
             location: URL(fileURLWithPath: "/usr/local/bin/tool")
         )
+        let missing = integration(host: available, hooks: .missing)
+        let current = integration(host: available, hooks: .current)
         return SetupIntegrationOperationsSnapshot(
-            missing: SetupIntegrationOperations.available(
-                for: integration(host: available, hooks: .missing)
-            ),
-            current: SetupIntegrationOperations.available(
-                for: integration(host: available, hooks: .current)
-            ),
+            missing: SetupIntegrationOperations.available(for: missing),
+            current: SetupIntegrationOperations.available(for: current),
             outdated: SetupIntegrationOperations.available(
                 for: integration(host: available, hooks: .outdated)
             ),
@@ -131,7 +131,9 @@ enum SetupWorkflowFixtures {
             ),
             unavailable: SetupIntegrationOperations.available(
                 for: integration(host: .unavailable, hooks: .missing)
-            )
+            ),
+            currentCanTest: SetupIntegrationOperations.canTest(current),
+            missingCanTest: SetupIntegrationOperations.canTest(missing)
         )
     }
 

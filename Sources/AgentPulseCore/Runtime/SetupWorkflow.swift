@@ -102,6 +102,13 @@ enum SetupPresentationPolicy {
 }
 
 enum SetupIntegrationOperations {
+    static func canTest(_ integration: IntegrationHealthSnapshot) -> Bool {
+        if case .current = integration.hooks {
+            return true
+        }
+        return false
+    }
+
     static func available(for integration: IntegrationHealthSnapshot) -> [SetupOperation] {
         switch integration.hooks {
         case .missing:
