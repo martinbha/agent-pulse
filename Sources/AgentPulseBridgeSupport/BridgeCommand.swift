@@ -3,7 +3,7 @@ import Foundation
 public enum BridgeCommand: Equatable, Sendable {
     case hook(agent: String)
     case version
-    case doctor
+    case doctor(agent: String?)
     case none
 
     private static let supportedAgents = Set(["claude", "codex"])
@@ -16,7 +16,11 @@ public enum BridgeCommand: Equatable, Sendable {
         case "--version":
             return .version
         case "--doctor":
-            return .doctor
+            let agent = arguments.dropFirst().first
+            guard agent == nil || supportedAgents.contains(agent!) else {
+                return .none
+            }
+            return .doctor(agent: agent)
         default:
             return supportedAgents.contains(first) ? .hook(agent: first) : .none
         }

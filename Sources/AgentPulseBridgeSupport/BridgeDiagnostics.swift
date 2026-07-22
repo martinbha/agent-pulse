@@ -51,6 +51,21 @@ public enum BridgeDoctorExitCode {
         }
         return generalFailure
     }
+
+    public static func forSelfTestFailure(_ failure: BridgeSelfTestFailure) -> Int32 {
+        switch failure.stage {
+        case .configuration:
+            return invalidConfiguration
+        case .connection, .stateQuery, .ingestion:
+            return serverUnavailable
+        case .authorization:
+            return authorizationFailure
+        case .decode:
+            return invalidServerResponse
+        case .executable, .input, .cancelled:
+            return generalFailure
+        }
+    }
 }
 
 public struct BridgeLogger: Sendable {
