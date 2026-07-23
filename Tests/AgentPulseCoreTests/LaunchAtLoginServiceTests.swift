@@ -57,6 +57,14 @@ import Testing
         #expect(rejected.failure?.recovery.contains("rejected the request") == true)
     }
 
+    @Test @MainActor func registrationErrorUsesTheResultingApprovalState() {
+        let snapshot = LaunchAtLoginServiceFixtures.registrationFailureRequiringApproval()
+
+        #expect(snapshot.health == .requiresApproval)
+        #expect(snapshot.failure?.message.contains("requires approval") == true)
+        #expect(snapshot.failure?.recovery.contains("Login Items") == true)
+    }
+
     @Test func presentationReflectsRegistrationAndDevelopmentStates() {
         let snapshot = LaunchAtLoginServiceFixtures.presentation()
 

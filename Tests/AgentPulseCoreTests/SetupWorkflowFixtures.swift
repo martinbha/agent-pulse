@@ -55,6 +55,11 @@ struct SetupSelfTestSnapshot {
     var noticeMessage: String?
 }
 
+struct SetupLaunchAtLoginNoticeSnapshot {
+    var noticeAfterOperation: SetupOperationNotice?
+    var noticeAfterExternalRefresh: SetupOperationNotice?
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -265,6 +270,27 @@ enum SetupWorkflowFixtures {
             inspectionCount: inspectionCount,
             noticeKind: workflow.testNotices[.codex]?.kind,
             noticeMessage: workflow.testNotices[.codex]?.message
+        )
+    }
+
+    @MainActor
+    static func launchAtLoginNoticeLifecycle() async -> SetupLaunchAtLoginNoticeSnapshot {
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Launch at Login enabled")
+            }
+        )
+
+        await workflow.perform(.setLaunchAtLogin(true))
+        let noticeAfterOperation = workflow.launchAtLoginNotice
+        await workflow.refresh()
+        return SetupLaunchAtLoginNoticeSnapshot(
+            noticeAfterOperation: noticeAfterOperation,
+            noticeAfterExternalRefresh: workflow.launchAtLoginNotice
         )
     }
 

@@ -20,8 +20,12 @@ public final class AgentPulseAppDelegate: NSObject, NSApplicationDelegate {
         guard let runtime else {
             return
         }
+        let setup = runtime.setup
+        guard setup.snapshot != nil else {
+            return
+        }
         Task {
-            await runtime.setup.refresh()
+            await setup.refresh()
         }
     }
 

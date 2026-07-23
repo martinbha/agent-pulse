@@ -244,7 +244,10 @@ final class SetupWorkflow: ObservableObject {
         defaults.set(true, forKey: Self.welcomeSeenKey)
     }
 
-    func refresh() async {
+    func refresh(clearsLaunchAtLoginNotice: Bool = true) async {
+        if clearsLaunchAtLoginNotice {
+            launchAtLoginNotice = nil
+        }
         guard !isRefreshing else {
             return
         }
@@ -307,7 +310,7 @@ final class SetupWorkflow: ObservableObject {
         if case .setLaunchAtLogin = operation {
             launchAtLoginNotice = notice
         }
-        await refresh()
+        await refresh(clearsLaunchAtLoginNotice: false)
     }
 
     func dismissNotice() {

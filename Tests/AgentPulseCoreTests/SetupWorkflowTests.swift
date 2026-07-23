@@ -70,6 +70,13 @@ import Testing
         #expect(snapshot.noticeMessage == "Delivery verified")
     }
 
+    @Test @MainActor func externalRefreshClearsLaunchAtLoginMutationNotice() async {
+        let snapshot = await SetupWorkflowFixtures.launchAtLoginNoticeLifecycle()
+
+        #expect(snapshot.noticeAfterOperation?.kind == .success)
+        #expect(snapshot.noticeAfterExternalRefresh == nil)
+    }
+
     @Test @MainActor func translocationPreventsConfigurationMutation() async {
         let snapshot = await SetupWorkflowFixtures.translocatedMutation()
 

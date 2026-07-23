@@ -100,10 +100,21 @@ struct LaunchAtLoginService {
                 do {
                     try register()
                 } catch {
-                    throw LaunchAtLoginFailure(
-                        message: "Agent Pulse could not be added to Launch at Login.",
-                        recovery: "Move Agent Pulse to an Applications folder, reopen it, and retry. \(error.localizedDescription)"
-                    )
+                    switch statusProvider() {
+                    case .enabled:
+                        return .enabled
+                    case .requiresApproval:
+                        throw approvalFailure
+                    case .notFound:
+                        throw notFoundFailure
+                    case .unavailable(let reason):
+                        throw unavailableFailure(reason)
+                    case .notRegistered:
+                        throw LaunchAtLoginFailure(
+                            message: "Agent Pulse could not be added to Launch at Login.",
+                            recovery: "Move Agent Pulse to an Applications folder, reopen it, and retry. \(error.localizedDescription)"
+                        )
+                    }
                 }
             }
         } else {
@@ -118,10 +129,19 @@ struct LaunchAtLoginService {
                 do {
                     try unregister()
                 } catch {
-                    throw LaunchAtLoginFailure(
-                        message: "Agent Pulse could not be removed from Launch at Login.",
-                        recovery: "Open System Settings → General → Login Items and remove Agent Pulse, then return and refresh. \(error.localizedDescription)"
-                    )
+                    switch statusProvider() {
+                    case .notRegistered:
+                        return .notRegistered
+                    case .notFound:
+                        throw notFoundFailure
+                    case .unavailable(let reason):
+                        throw unavailableFailure(reason)
+                    case .enabled, .requiresApproval:
+                        throw LaunchAtLoginFailure(
+                            message: "Agent Pulse could not be removed from Launch at Login.",
+                            recovery: "Open System Settings → General → Login Items and remove Agent Pulse, then return and refresh. \(error.localizedDescription)"
+                        )
+                    }
                 }
             }
         }

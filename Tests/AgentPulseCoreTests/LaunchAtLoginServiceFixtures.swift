@@ -24,6 +24,7 @@ private final class LaunchAtLoginServiceState {
     var unregisterCount = 0
     var registerError: Error?
     var unregisterError: Error?
+    var statusAfterRegisterError: LaunchAtLoginRegistrationStatus?
     var registeredStatus: LaunchAtLoginRegistrationStatus = .enabled
 
     init(status: LaunchAtLoginRegistrationStatus) {
@@ -41,6 +42,9 @@ private final class LaunchAtLoginServiceState {
             register: {
                 self.registerCount += 1
                 if let registerError = self.registerError {
+                    if let statusAfterRegisterError = self.statusAfterRegisterError {
+                        self.status = statusAfterRegisterError
+                    }
                     throw registerError
                 }
                 self.status = self.registeredStatus
@@ -110,6 +114,15 @@ enum LaunchAtLoginServiceFixtures {
     static func registrationFailure() -> LaunchAtLoginMutationSnapshot {
         let state = LaunchAtLoginServiceState(status: .notRegistered)
         state.registerError = SampleLaunchAtLoginError()
+        let service = state.makeService()
+        return capture(service: service, state: state, enabled: true)
+    }
+
+    @MainActor
+    static func registrationFailureRequiringApproval() -> LaunchAtLoginMutationSnapshot {
+        let state = LaunchAtLoginServiceState(status: .notRegistered)
+        state.registerError = SampleLaunchAtLoginError()
+        state.statusAfterRegisterError = .requiresApproval
         let service = state.makeService()
         return capture(service: service, state: state, enabled: true)
     }
