@@ -18,10 +18,9 @@ logins to fetch usage — combining them into a quiet ambient indicator.
 - **Dropdown** — click a pill for per-agent **5h** and **weekly** usage bars with
   reset times, the project and last event, a last-updated time, and a manual
   refresh button.
-- **Setup** — guided installation, repair, and removal of Claude Code and Codex
-  integrations, with health and last-event status for each tool.
-- **Settings** — customizable Claude and Codex brand colors, usage refresh
-  interval controls, shortcut configuration, and manual preview events.
+- **Settings** — guided integration setup and health checks, notification and
+  launch controls, customizable brand colors, usage refresh, shortcut
+  configuration, and manual preview events.
 
 Usage is fetched from your existing Claude and Codex logins with no separate
 sign-in, and Claude Desktop auth state is read-only. See
@@ -48,12 +47,12 @@ open "$HOME/Applications/Agent Pulse.app"
 ```
 
 This source-built bundle is signed locally rather than notarized for download.
-On first launch, Agent Pulse opens Setup automatically. Each detected tool has
+On first launch, Agent Pulse opens Settings automatically. Each detected tool has
 its own status card; choose **Set Up** to install the local bridge and configure
 that tool without editing files or running additional shell commands. Choose
 **Test** afterward to verify correlated delivery without changing the normal
-agent status or sending an event notification. Setup is always available later
-from the menu-bar dropdown or Settings.
+agent status or sending an event notification. Settings is always available
+from the menu-bar dropdown.
 
 ## Development
 
