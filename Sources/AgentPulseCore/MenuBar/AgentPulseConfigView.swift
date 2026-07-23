@@ -9,133 +9,142 @@ struct AgentPulseConfigView: View {
     var openSetup: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
 
-            Divider()
+                Divider()
 
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Integrations")
-                        .agentPulseFont(size: 15)
-                    Text("Install, repair, or remove local tool connections.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button("Open Setup") {
-                    openSetup()
-                }
-            }
-
-            Divider()
-
-            UsageRefreshSettings(usageStore: usageStore)
-
-            Divider()
-
-            BrandColorSettings(appearance: appearance)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Overlay Shortcut")
-                    .agentPulseFont(size: 15)
                 HStack {
-                    Text("Toggle pinned overlay")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Integrations")
+                            .agentPulseFont(size: 15)
+                        Text("Install, repair, or remove local tool connections.")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button("Open Setup") {
+                        openSetup()
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Launch at Login")
+                        .agentPulseFont(size: 15)
+                    LaunchAtLoginControl(workflow: setup, showsTitle: false)
+                }
+
+                Divider()
+
+                UsageRefreshSettings(usageStore: usageStore)
+
+                Divider()
+
+                BrandColorSettings(appearance: appearance)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Overlay Shortcut")
+                        .agentPulseFont(size: 15)
+                    HStack {
+                        Text("Toggle pinned overlay")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HotkeyRecorder(settings: hotkeySettings)
+                    }
+                    .agentPulseFont(size: 12)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Delivery Self-Test")
+                        .agentPulseFont(size: 15)
+
+                    Text("Runs the installed bridge through the authenticated local server without changing agent status or sending a notification.")
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    HotkeyRecorder(settings: hotkeySettings)
-                }
-                .agentPulseFont(size: 12)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Delivery Self-Test")
-                    .agentPulseFont(size: 15)
-
-                Text("Runs the installed bridge through the authenticated local server without changing agent status or sending a notification.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    deliveryTestButton(.claude)
-                    deliveryTestButton(.codex)
-                    Spacer()
-                }
-
-                ForEach(AgentKind.allCases) { agent in
-                    if let notice = setup.testNotices[agent] {
-                        Label(
-                            notice.message,
-                            systemImage: notice.kind == .success
-                                ? "checkmark.circle.fill"
-                                : "xmark.octagon.fill"
-                        )
-                        .foregroundStyle(notice.kind == .success ? .green : .red)
                         .fixedSize(horizontal: false, vertical: true)
 
-                        if let recovery = notice.recovery {
-                            Text(recovery)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        deliveryTestButton(.claude)
+                        deliveryTestButton(.codex)
+                        Spacer()
+                    }
+
+                    ForEach(AgentKind.allCases) { agent in
+                        if let notice = setup.testNotices[agent] {
+                            Label(
+                                notice.message,
+                                systemImage: notice.kind == .success
+                                    ? "checkmark.circle.fill"
+                                    : "xmark.octagon.fill"
+                            )
+                            .foregroundStyle(notice.kind == .success ? .green : .red)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                            if let recovery = notice.recovery {
+                                Text(recovery)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Preview Events")
+                        .agentPulseFont(size: 15)
+
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Button {
+                                runtime.sendTestEvent(agent: .claude)
+                            } label: {
+                                Label("Start Claude", systemImage: "play.circle")
+                            }
+
+                            Button {
+                                runtime.sendTestEvent(agent: .codex)
+                            } label: {
+                                Label("Start Codex", systemImage: "play.circle")
+                            }
+
+                            Spacer()
+                        }
+
+                        HStack(spacing: 8) {
+                            Button {
+                                runtime.stopTestEvent(agent: .claude)
+                            } label: {
+                                Label("Stop Claude", systemImage: "stop.circle")
+                            }
+
+                            Button {
+                                runtime.stopTestEvent(agent: .codex)
+                            } label: {
+                                Label("Stop Codex", systemImage: "stop.circle")
+                            }
+
+                            Spacer()
+
+                            Button {
+                                runtime.clearCompleted()
+                            } label: {
+                                Label("Clear", systemImage: "checkmark.circle")
+                            }
                         }
                     }
                 }
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Preview Events")
-                    .agentPulseFont(size: 15)
-
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Button {
-                            runtime.sendTestEvent(agent: .claude)
-                        } label: {
-                            Label("Start Claude", systemImage: "play.circle")
-                        }
-
-                        Button {
-                            runtime.sendTestEvent(agent: .codex)
-                        } label: {
-                            Label("Start Codex", systemImage: "play.circle")
-                        }
-
-                        Spacer()
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            runtime.stopTestEvent(agent: .claude)
-                        } label: {
-                            Label("Stop Claude", systemImage: "stop.circle")
-                        }
-
-                        Button {
-                            runtime.stopTestEvent(agent: .codex)
-                        } label: {
-                            Label("Stop Codex", systemImage: "stop.circle")
-                        }
-
-                        Spacer()
-
-                        Button {
-                            runtime.clearCompleted()
-                        } label: {
-                            Label("Clear", systemImage: "checkmark.circle")
-                        }
-                    }
-                }
-            }
-
+            .padding(20)
         }
-        .padding(20)
         .frame(width: 460)
         .agentPulseFont(size: 13)
         .task {

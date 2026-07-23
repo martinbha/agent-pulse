@@ -22,6 +22,7 @@ struct SetupView: View {
                     if let snapshot = workflow.snapshot {
                         setupSummary(snapshot)
                         bridgeCard(snapshot)
+                        launchAtLoginCard()
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Integrations")
@@ -171,6 +172,11 @@ struct SetupView: View {
             }
         }
         .setupCard()
+    }
+
+    private func launchAtLoginCard() -> some View {
+        LaunchAtLoginControl(workflow: workflow)
+            .setupCard()
     }
 
     private func integrationCard(
@@ -385,12 +391,15 @@ struct SetupView: View {
             }
         case .testIntegration(let agent):
             operationButton(.test(agent))
+        case .approveLaunchAtLogin:
+            Button("Open Login Items Settings") {
+                LoginItemsSettings.open()
+            }
         case .installHost,
              .installIntegration,
              .repairIntegration,
              .requestNotificationPermission,
              .openNotificationSettings,
-             .approveLaunchAtLogin,
              .none:
             EmptyView()
         }

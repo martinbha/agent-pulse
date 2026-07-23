@@ -4,6 +4,7 @@ import AgentPulseBridgeSupport
 enum SetupOperation: Equatable {
     case installBridge
     case repairBridge
+    case setLaunchAtLogin(Bool)
     case setUp(AgentKind)
     case repair(AgentKind)
     case test(AgentKind)
@@ -13,7 +14,7 @@ enum SetupOperation: Equatable {
         switch self {
         case .setUp(let agent), .repair(let agent), .test(let agent), .remove(let agent):
             return agent
-        case .installBridge, .repairBridge:
+        case .installBridge, .repairBridge, .setLaunchAtLogin:
             return nil
         }
     }
@@ -22,6 +23,8 @@ enum SetupOperation: Equatable {
         switch self {
         case .installBridge: return "Install Bridge"
         case .repairBridge: return "Repair Bridge"
+        case .setLaunchAtLogin(let enabled):
+            return enabled ? "Enable" : "Disable"
         case .setUp: return "Set Up"
         case .repair: return "Repair"
         case .test: return "Test"
@@ -31,7 +34,7 @@ enum SetupOperation: Equatable {
 
     var changesFiles: Bool {
         switch self {
-        case .test:
+        case .test, .setLaunchAtLogin:
             return false
         case .installBridge, .repairBridge, .setUp, .repair, .remove:
             return true
@@ -168,12 +171,13 @@ enum SetupIntegrationStateResolver {
 @MainActor
 final class SetupWorkflow: ObservableObject {
     typealias InspectionProvider = () async -> SetupHealthSnapshot
-    typealias OperationExecutor = (SetupOperation) async throws -> SetupOperationReport
+    typealias OperationExecutor = @MainActor (SetupOperation) async throws -> SetupOperationReport
 
     @Published private(set) var snapshot: SetupHealthSnapshot?
     @Published private(set) var isRefreshing = false
     @Published private(set) var activeOperation: SetupOperation?
     @Published private(set) var notice: SetupOperationNotice?
+    @Published private(set) var launchAtLoginNotice: SetupOperationNotice?
     @Published private(set) var testNotices: [AgentKind: SetupOperationNotice] = [:]
 
     private let defaults: UserDefaults
@@ -197,8 +201,14 @@ final class SetupWorkflow: ObservableObject {
             preconditionFailure("The local endpoint must be a valid URL")
         }
 
-        let inspector = SetupHealthInspector.live(endpoint: endpoint)
-        let executor = SetupMutationExecutor.live()
+        let launchAtLogin = LaunchAtLoginService.live()
+        let inspector = SetupHealthInspector.live(
+            endpoint: endpoint,
+            launchAtLoginService: launchAtLogin
+        )
+        let executor = SetupMutationExecutor.live(
+            launchAtLoginService: launchAtLogin
+        )
         return SetupWorkflow(
             inspectionProvider: { [unowned runtime] in
                 let usage = Dictionary(
@@ -234,7 +244,10 @@ final class SetupWorkflow: ObservableObject {
         defaults.set(true, forKey: Self.welcomeSeenKey)
     }
 
-    func refresh() async {
+    func refresh(clearsLaunchAtLoginNotice: Bool = true) async {
+        if clearsLaunchAtLoginNotice {
+            launchAtLoginNotice = nil
+        }
         guard !isRefreshing else {
             return
         }
@@ -263,6 +276,9 @@ final class SetupWorkflow: ObservableObject {
 
         activeOperation = operation
         notice = nil
+        if case .setLaunchAtLogin = operation {
+            launchAtLoginNotice = nil
+        }
         if case .test(let agent) = operation {
             testNotices[agent] = nil
         }
@@ -291,7 +307,10 @@ final class SetupWorkflow: ObservableObject {
         if case .test(let agent) = operation {
             testNotices[agent] = notice
         }
-        await refresh()
+        if case .setLaunchAtLogin = operation {
+            launchAtLoginNotice = notice
+        }
+        await refresh(clearsLaunchAtLoginNotice: false)
     }
 
     func dismissNotice() {
@@ -302,10 +321,12 @@ final class SetupWorkflow: ObservableObject {
 struct SetupMutationExecutor {
     let execute: SetupWorkflow.OperationExecutor
 
+    @MainActor
     static func live(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         bundleURL: URL = Bundle.main.bundleURL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        launchAtLoginService: LaunchAtLoginService? = nil
     ) -> SetupMutationExecutor {
         let bridge = BridgeInstaller(
             homeDirectory: homeDirectory,
@@ -326,6 +347,10 @@ struct SetupMutationExecutor {
             homeDirectory: homeDirectory,
             fileManager: fileManager
         )
+        let launchAtLogin = launchAtLoginService ?? LaunchAtLoginService.live(
+            homeDirectory: homeDirectory,
+            bundleURL: bundleURL
+        )
 
         return SetupMutationExecutor { operation in
             switch operation {
@@ -335,6 +360,20 @@ struct SetupMutationExecutor {
             case .repairBridge:
                 try repairBridge(using: bridge)
                 return SetupOperationReport(message: "The local bridge was repaired successfully.")
+            case .setLaunchAtLogin(let enabled):
+                do {
+                    _ = try launchAtLogin.setEnabled(enabled)
+                    return SetupOperationReport(
+                        message: enabled
+                            ? "Agent Pulse will launch when you sign in."
+                            : "Agent Pulse will no longer launch when you sign in."
+                    )
+                } catch let failure as LaunchAtLoginFailure {
+                    throw SetupOperationFailure(
+                        message: failure.message,
+                        recovery: failure.recovery
+                    )
+                }
             case .setUp(let agent):
                 try installBridge(using: bridge)
                 try applyIntegration(
