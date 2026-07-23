@@ -145,7 +145,7 @@ struct AgentPulseConfigView: View {
             }
             .padding(20)
         }
-        .frame(width: 460)
+        .frame(width: 460, height: 620)
         .agentPulseFont(size: 13)
         .task {
             if setup.snapshot == nil {
