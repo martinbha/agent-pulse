@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import UserNotifications
 
@@ -193,7 +194,15 @@ struct NotificationPermissionService {
             )
         }
         if action == .request {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound])
+            let granted: Bool
+            do {
+                granted = try await center.requestAuthorization(options: [.alert, .sound])
+            } catch {
+                throw NotificationPermissionFailure(
+                    message: "Agent Pulse could not request notification permission.",
+                    recovery: "Open System Settings → Notifications, allow Agent Pulse, then retry. \(error.localizedDescription)"
+                )
+            }
             guard granted else {
                 throw NotificationPermissionFailure(
                     message: "Agent Pulse notifications were not allowed.",
@@ -212,7 +221,14 @@ struct NotificationPermissionService {
             content: command.makeNotificationContent(),
             trigger: nil
         )
-        try await center.add(request)
+        do {
+            try await center.add(request)
+        } catch {
+            throw NotificationPermissionFailure(
+                message: "The development fallback notification could not be delivered.",
+                recovery: "Open System Settings → Notifications, review the Agent Pulse entry, then retry. \(error.localizedDescription)"
+            )
+        }
         Task {
             try? await Task.sleep(for: .seconds(NotificationTiming.bannerDismissalDelay))
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
@@ -240,6 +256,21 @@ struct NotificationPermissionService {
             }
             if process.isRunning {
                 process.terminate()
+                let terminationDeadline = Date().addingTimeInterval(1)
+                while process.isRunning && Date() < terminationDeadline {
+                    usleep(50_000)
+                }
+                if process.isRunning {
+                    process.interrupt()
+                    let interruptionDeadline = Date().addingTimeInterval(1)
+                    while process.isRunning && Date() < interruptionDeadline {
+                        usleep(50_000)
+                    }
+                }
+                if process.isRunning {
+                    kill(process.processIdentifier, SIGKILL)
+                }
+                process.waitUntilExit()
                 throw NotificationPermissionFailure(
                     message: "The notification helper did not finish.",
                     recovery: "Retry the operation and respond to any visible macOS permission prompt."
