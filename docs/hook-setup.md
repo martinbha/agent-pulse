@@ -213,7 +213,7 @@ Pulse owns the marker-delimited block and leaves all other TOML content intact.
 
 ## Delivery diagnostics
 
-The **Test** button in Setup or Settings is the preferred delivery check. For a
+The **Test** button in Settings is the preferred delivery check. For a
 terminal-based diagnostic, keep Agent Pulse running and execute:
 
 ```bash

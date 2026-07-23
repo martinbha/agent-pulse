@@ -7,8 +7,7 @@ struct AgentStatusPanel: View {
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
     @ObservedObject var appLauncher: AgentAppLauncher
-    var openSetup: () -> Void
-    var openConfig: () -> Void
+    var openSettings: () -> Void
     var dismiss: () -> Void
 
     var body: some View {
@@ -41,13 +40,7 @@ struct AgentStatusPanel: View {
 
             HStack {
                 Button {
-                    openSetup()
-                } label: {
-                    Label("Setup", systemImage: "checklist")
-                }
-
-                Button {
-                    openConfig()
+                    openSettings()
                 } label: {
                     Label("Settings", systemImage: "gearshape")
                 }
