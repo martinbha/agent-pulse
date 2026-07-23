@@ -60,6 +60,11 @@ struct SetupLaunchAtLoginNoticeSnapshot {
     var noticeAfterExternalRefresh: SetupOperationNotice?
 }
 
+struct SetupNotificationNoticeLifecycleSnapshot {
+    var noticeAfterOperation: SetupOperationNotice?
+    var noticeAfterExternalRefresh: SetupOperationNotice?
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -270,6 +275,52 @@ enum SetupWorkflowFixtures {
             inspectionCount: inspectionCount,
             noticeKind: workflow.testNotices[.codex]?.kind,
             noticeMessage: workflow.testNotices[.codex]?.message
+        )
+    }
+
+    @MainActor
+    static func successfulNotificationTest() async -> SetupSelfTestSnapshot {
+        var inspectionCount = 0
+        var executed: [SetupOperation] = []
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                inspectionCount += 1
+                return makeSnapshot()
+            },
+            operationExecutor: { operation in
+                executed.append(operation)
+                return SetupOperationReport(message: "Notification delivered")
+            }
+        )
+
+        await workflow.perform(.testNotification(.claude))
+        return SetupSelfTestSnapshot(
+            executed: executed,
+            inspectionCount: inspectionCount,
+            noticeKind: workflow.notificationNotices[.claude]?.kind,
+            noticeMessage: workflow.notificationNotices[.claude]?.message
+        )
+    }
+
+    @MainActor
+    static func notificationNoticeLifecycle() async -> SetupNotificationNoticeLifecycleSnapshot {
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Notification delivered")
+            }
+        )
+
+        await workflow.perform(.testNotification(.codex))
+        let noticeAfterOperation = workflow.notificationNotices[.codex]
+        await workflow.refresh()
+        return SetupNotificationNoticeLifecycleSnapshot(
+            noticeAfterOperation: noticeAfterOperation,
+            noticeAfterExternalRefresh: workflow.notificationNotices[.codex]
         )
     }
 

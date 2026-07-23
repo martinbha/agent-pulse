@@ -128,6 +128,7 @@ struct SetupHealthSnapshot: Equatable, Sendable {
     let bridge: BridgeHealth
     let integrations: [IntegrationHealthSnapshot]
     let notifications: NotificationAuthorizationHealth
+    let notificationHelpers: [AgentKind: NotificationAuthorizationHealth]
     let launchAtLogin: LaunchAtLoginHealth
     let recommendedAction: SetupRecommendedAction
     let blockingIssue: SetupBlockingIssue?
@@ -174,6 +175,7 @@ enum SetupHealthClassifier {
         usage: [AgentKind: UsageAvailability],
         events: [AgentKind: AgentStatusSnapshot],
         notifications: NotificationAuthorizationHealth,
+        notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:],
         launchAtLogin: LaunchAtLoginHealth
     ) -> SetupHealthSnapshot {
         let integrations = AgentKind.allCases.map { agent in
@@ -203,6 +205,7 @@ enum SetupHealthClassifier {
             bridge: bridge,
             integrations: integrations,
             notifications: notifications,
+            notificationHelpers: notificationHelpers,
             launchAtLogin: launchAtLogin
         )
         return SetupHealthSnapshot(
@@ -212,6 +215,7 @@ enum SetupHealthClassifier {
             bridge: bridge,
             integrations: integrations,
             notifications: notifications,
+            notificationHelpers: notificationHelpers,
             launchAtLogin: launchAtLogin,
             recommendedAction: decision.action,
             blockingIssue: decision.blockingIssue
@@ -224,6 +228,7 @@ enum SetupHealthClassifier {
         bridge: BridgeHealth,
         integrations: [IntegrationHealthSnapshot],
         notifications: NotificationAuthorizationHealth,
+        notificationHelpers: [AgentKind: NotificationAuthorizationHealth],
         launchAtLogin: LaunchAtLoginHealth
     ) -> (action: SetupRecommendedAction, blockingIssue: SetupBlockingIssue?) {
         if case .translocated = application {
@@ -297,13 +302,16 @@ enum SetupHealthClassifier {
             return (action, nil)
         }
 
-        switch notifications {
-        case .notDetermined:
+        let actionableNotificationStates = notificationHelpers.values.contains {
+            if case .unavailable = $0 { return false }
+            return true
+        } ? Array(notificationHelpers.values) : [notifications]
+
+        if actionableNotificationStates.contains(.notDetermined) {
             return (.requestNotificationPermission, nil)
-        case .denied:
+        }
+        if actionableNotificationStates.contains(.denied) {
             return (.openNotificationSettings, nil)
-        case .authorized, .provisional, .ephemeral, .unavailable:
-            break
         }
 
         if launchAtLogin == .requiresApproval {
@@ -401,8 +409,15 @@ enum SetupHealthDiagnosticsRenderer {
                     + "last event \(eventSummary(integration.lastEvent))"
             )
         }
+        for agent in AgentKind.allCases {
+            if let health = snapshot.notificationHelpers[agent] {
+                lines.append(
+                    "\(agent.displayName) notification sender: \(notificationSummary(health))"
+                )
+            }
+        }
         lines += [
-            "Notifications: \(notificationSummary(snapshot.notifications))",
+            "Main app notifications: \(notificationSummary(snapshot.notifications))",
             "Launch at Login: \(launchAtLoginSummary(snapshot.launchAtLogin))",
         ]
         if let issue = snapshot.blockingIssue {

@@ -23,6 +23,7 @@ struct SetupView: View {
                         setupSummary(snapshot)
                         bridgeCard(snapshot)
                         launchAtLoginCard()
+                        notificationsCard(snapshot)
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Integrations")
@@ -177,6 +178,114 @@ struct SetupView: View {
     private func launchAtLoginCard() -> some View {
         LaunchAtLoginControl(workflow: workflow)
             .setupCard()
+    }
+
+    private func notificationsCard(_ snapshot: SetupHealthSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Notifications", systemImage: "bell.badge")
+                    .agentPulseFont(size: 16)
+                Spacer()
+                statusBadge(
+                    notificationSummaryLabel(snapshot),
+                    tone: notificationSummaryTone(snapshot)
+                )
+            }
+
+            Text("Agent Pulse uses a separate sender for each integration so notification banners keep the correct icon. Each sender may show one macOS permission prompt when you run its test.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            notificationStatusRow(
+                title: "Agent Pulse",
+                subtitle: "Development fallback",
+                health: snapshot.notifications,
+                action: nil
+            )
+
+            ForEach(AgentKind.allCases) { agent in
+                let health = snapshot.notificationHelpers[agent]
+                    ?? .unavailable("Notification helper status is unavailable.")
+                notificationStatusRow(
+                    title: agent.displayName,
+                    subtitle: "Integration sender",
+                    health: health,
+                    action: notificationAction(
+                        for: agent,
+                        health: health,
+                        application: snapshot.application
+                    )
+                )
+
+                if let notice = workflow.notificationNotices[agent] {
+                    Label(
+                        notice.message,
+                        systemImage: notice.kind == .success
+                            ? "checkmark.circle.fill"
+                            : "xmark.octagon.fill"
+                    )
+                    .foregroundStyle(notice.kind == .success ? .green : .red)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    if let recovery = notice.recovery {
+                        Text(recovery)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .setupCard()
+    }
+
+    private func notificationStatusRow(
+        title: String,
+        subtitle: String,
+        health: NotificationAuthorizationHealth,
+        action: SetupOperation?
+    ) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .agentPulseFont(size: 13)
+                Text(subtitle)
+                    .agentPulseFont(size: 11)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            statusBadge(
+                notificationLabel(health),
+                tone: notificationTone(health)
+            )
+
+            if health == .denied {
+                Button("Open Settings") {
+                    NotificationSettings.open()
+                }
+            } else if let action {
+                operationButton(action)
+            }
+        }
+    }
+
+    private func notificationAction(
+        for agent: AgentKind,
+        health: NotificationAuthorizationHealth,
+        application: ApplicationLocationHealth
+    ) -> SetupOperation? {
+        switch health {
+        case .notDetermined, .authorized, .provisional, .ephemeral:
+            return .testNotification(agent)
+        case .denied:
+            return nil
+        case .unavailable:
+            if case .unbundled = application {
+                return .testNotification(agent)
+            }
+            return nil
+        }
     }
 
     private func integrationCard(
@@ -395,11 +504,14 @@ struct SetupView: View {
             Button("Open Login Items Settings") {
                 LoginItemsSettings.open()
             }
+        case .openNotificationSettings:
+            Button("Open Notification Settings") {
+                NotificationSettings.open()
+            }
         case .installHost,
              .installIntegration,
              .repairIntegration,
              .requestNotificationPermission,
-             .openNotificationSettings,
              .none:
             EmptyView()
         }
@@ -548,6 +660,60 @@ struct SetupView: View {
         case .missing: return .neutral
         case .outdated: return .warning
         case .unreadable, .invalid: return .bad
+        }
+    }
+
+    private func notificationSummaryLabel(_ snapshot: SetupHealthSnapshot) -> String {
+        let helpers = Array(snapshot.notificationHelpers.values)
+        if helpers.contains(.denied) {
+            return "Action needed"
+        }
+        if helpers.contains(.notDetermined) {
+            return "Choose a sender"
+        }
+        if helpers.contains(where: isAuthorizedNotification) {
+            return "Ready"
+        }
+        return notificationLabel(snapshot.notifications)
+    }
+
+    private func notificationSummaryTone(_ snapshot: SetupHealthSnapshot) -> SetupTone {
+        let helpers = Array(snapshot.notificationHelpers.values)
+        if helpers.contains(.denied) {
+            return .bad
+        }
+        if helpers.contains(.notDetermined) {
+            return .neutral
+        }
+        if helpers.contains(where: isAuthorizedNotification) {
+            return .good
+        }
+        return notificationTone(snapshot.notifications)
+    }
+
+    private func notificationLabel(_ health: NotificationAuthorizationHealth) -> String {
+        switch health {
+        case .notDetermined: return "Not requested"
+        case .denied: return "Denied"
+        case .authorized, .provisional, .ephemeral: return "Allowed"
+        case .unavailable: return "Unavailable"
+        }
+    }
+
+    private func notificationTone(_ health: NotificationAuthorizationHealth) -> SetupTone {
+        switch health {
+        case .authorized, .provisional, .ephemeral: return .good
+        case .notDetermined, .unavailable: return .neutral
+        case .denied: return .bad
+        }
+    }
+
+    private func isAuthorizedNotification(_ health: NotificationAuthorizationHealth) -> Bool {
+        switch health {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .notDetermined, .denied, .unavailable:
+            return false
         }
     }
 

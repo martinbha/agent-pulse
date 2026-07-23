@@ -5,6 +5,7 @@ enum SetupOperation: Equatable {
     case installBridge
     case repairBridge
     case setLaunchAtLogin(Bool)
+    case testNotification(AgentKind)
     case setUp(AgentKind)
     case repair(AgentKind)
     case test(AgentKind)
@@ -12,7 +13,11 @@ enum SetupOperation: Equatable {
 
     var agent: AgentKind? {
         switch self {
-        case .setUp(let agent), .repair(let agent), .test(let agent), .remove(let agent):
+        case .setUp(let agent),
+             .repair(let agent),
+             .test(let agent),
+             .testNotification(let agent),
+             .remove(let agent):
             return agent
         case .installBridge, .repairBridge, .setLaunchAtLogin:
             return nil
@@ -25,6 +30,7 @@ enum SetupOperation: Equatable {
         case .repairBridge: return "Repair Bridge"
         case .setLaunchAtLogin(let enabled):
             return enabled ? "Enable" : "Disable"
+        case .testNotification: return "Send Test"
         case .setUp: return "Set Up"
         case .repair: return "Repair"
         case .test: return "Test"
@@ -34,7 +40,7 @@ enum SetupOperation: Equatable {
 
     var changesFiles: Bool {
         switch self {
-        case .test, .setLaunchAtLogin:
+        case .test, .testNotification, .setLaunchAtLogin:
             return false
         case .installBridge, .repairBridge, .setUp, .repair, .remove:
             return true
@@ -178,6 +184,7 @@ final class SetupWorkflow: ObservableObject {
     @Published private(set) var activeOperation: SetupOperation?
     @Published private(set) var notice: SetupOperationNotice?
     @Published private(set) var launchAtLoginNotice: SetupOperationNotice?
+    @Published private(set) var notificationNotices: [AgentKind: SetupOperationNotice] = [:]
     @Published private(set) var testNotices: [AgentKind: SetupOperationNotice] = [:]
 
     private let defaults: UserDefaults
@@ -202,11 +209,14 @@ final class SetupWorkflow: ObservableObject {
         }
 
         let launchAtLogin = LaunchAtLoginService.live()
+        let notificationPermissions = NotificationPermissionService.live()
         let inspector = SetupHealthInspector.live(
             endpoint: endpoint,
+            notificationPermissionService: notificationPermissions,
             launchAtLoginService: launchAtLogin
         )
         let executor = SetupMutationExecutor.live(
+            notificationPermissionService: notificationPermissions,
             launchAtLoginService: launchAtLogin
         )
         return SetupWorkflow(
@@ -244,9 +254,15 @@ final class SetupWorkflow: ObservableObject {
         defaults.set(true, forKey: Self.welcomeSeenKey)
     }
 
-    func refresh(clearsLaunchAtLoginNotice: Bool = true) async {
+    func refresh(
+        clearsLaunchAtLoginNotice: Bool = true,
+        clearsNotificationNotices: Bool = true
+    ) async {
         if clearsLaunchAtLoginNotice {
             launchAtLoginNotice = nil
+        }
+        if clearsNotificationNotices {
+            notificationNotices = [:]
         }
         guard !isRefreshing else {
             return
@@ -282,6 +298,9 @@ final class SetupWorkflow: ObservableObject {
         if case .test(let agent) = operation {
             testNotices[agent] = nil
         }
+        if case .testNotification(let agent) = operation {
+            notificationNotices[agent] = nil
+        }
         await Task.yield()
         do {
             let report = try await operationExecutor(operation)
@@ -307,10 +326,16 @@ final class SetupWorkflow: ObservableObject {
         if case .test(let agent) = operation {
             testNotices[agent] = notice
         }
+        if case .testNotification(let agent) = operation {
+            notificationNotices[agent] = notice
+        }
         if case .setLaunchAtLogin = operation {
             launchAtLoginNotice = notice
         }
-        await refresh(clearsLaunchAtLoginNotice: false)
+        await refresh(
+            clearsLaunchAtLoginNotice: false,
+            clearsNotificationNotices: false
+        )
     }
 
     func dismissNotice() {
@@ -326,6 +351,7 @@ struct SetupMutationExecutor {
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default,
+        notificationPermissionService: NotificationPermissionService? = nil,
         launchAtLoginService: LaunchAtLoginService? = nil
     ) -> SetupMutationExecutor {
         let bridge = BridgeInstaller(
@@ -351,7 +377,6 @@ struct SetupMutationExecutor {
             homeDirectory: homeDirectory,
             bundleURL: bundleURL
         )
-
         return SetupMutationExecutor { operation in
             switch operation {
             case .installBridge:
@@ -369,6 +394,23 @@ struct SetupMutationExecutor {
                             : "Agent Pulse will no longer launch when you sign in."
                     )
                 } catch let failure as LaunchAtLoginFailure {
+                    throw SetupOperationFailure(
+                        message: failure.message,
+                        recovery: failure.recovery
+                    )
+                }
+            case .testNotification(let agent):
+                do {
+                    let notificationPermissions = notificationPermissionService
+                        ?? NotificationPermissionService.live(
+                            bundleURL: bundleURL,
+                            fileManager: fileManager
+                        )
+                    try await notificationPermissions.sendTest(for: agent)
+                    return SetupOperationReport(
+                        message: "\(agent.displayName) sent a test notification."
+                    )
+                } catch let failure as NotificationPermissionFailure {
                     throw SetupOperationFailure(
                         message: failure.message,
                         recovery: failure.recovery
