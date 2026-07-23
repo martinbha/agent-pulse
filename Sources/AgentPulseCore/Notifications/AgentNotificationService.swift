@@ -17,7 +17,6 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
 
         center.delegate = self
         center.removeAllDeliveredNotifications()
-        requestAuthorization()
     }
 
     func handleTransition(
@@ -54,18 +53,6 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
 
         await HostAppOpener.open(bundleID: hostBundleID)
-    }
-
-    private func requestAuthorization() {
-        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-            Task { @MainActor in
-                if let error {
-                    NSLog("Agent Pulse notification authorization failed: %@", error.localizedDescription)
-                } else if !granted {
-                    NSLog("Agent Pulse notifications were not granted")
-                }
-            }
-        }
     }
 
     private func notify(agent: AgentKind, action: String, snapshot: AgentStatusSnapshot) {
@@ -132,30 +119,42 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
     /// Direct posting from the main app remains as the fallback when the
     /// helper bundles are unavailable (e.g. running straight from `swift build`).
     private func postDirectly(_ command: NotifierCommand, agent: AgentKind) {
-        let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
-        let request = UNNotificationRequest(
-            identifier: identifier,
-            content: command.makeNotificationContent(),
-            trigger: nil
-        )
-
-        center.add(request) { [center] error in
-            if let error {
-                Task { @MainActor in
-                    NSLog("Agent Pulse notification failed: %@", error.localizedDescription)
-                }
+        center.getNotificationSettings { [center] settings in
+            let status = NotifierAuthorizationStatus(settings.authorizationStatus)
+            guard NotifierAuthorizationPolicy.action(
+                for: status,
+                requestsAuthorization: false
+            ) == .post else {
                 return
             }
 
-            Task {
-                try? await Task.sleep(for: .seconds(NotificationTiming.bannerDismissalDelay))
-                center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            let identifier = "agent-pulse-\(agent.rawValue)-\(UUID().uuidString)"
+            let request = UNNotificationRequest(
+                identifier: identifier,
+                content: command.makeNotificationContent(),
+                trigger: nil
+            )
+
+            center.add(request) { [center] error in
+                if let error {
+                    Task { @MainActor in
+                        NSLog("Agent Pulse notification failed: %@", error.localizedDescription)
+                    }
+                    return
+                }
+
+                Task {
+                    try? await Task.sleep(
+                        for: .seconds(NotificationTiming.bannerDismissalDelay)
+                    )
+                    center.removeDeliveredNotifications(withIdentifiers: [identifier])
+                }
             }
         }
     }
 }
 
-private extension AgentKind {
+extension AgentKind {
     var notificationName: String {
         switch self {
         case .claude:

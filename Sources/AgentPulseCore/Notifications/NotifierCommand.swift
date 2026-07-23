@@ -5,22 +5,34 @@ import UserNotifications
 /// system started the helper for a notification interaction instead.
 public struct NotifierCommand: Equatable, Sendable {
     public static let hostBundleIDUserInfoKey = "hostBundleID"
+    public static let requestAuthorizationArgument = "--request-authorization"
+    public static let authorizationStatusArgument = "--authorization-status"
 
     public var title: String
     public var body: String
     public var hostBundleID: String?
+    public var requestsAuthorization: Bool
 
-    public init(title: String, body: String, hostBundleID: String? = nil) {
+    public init(
+        title: String,
+        body: String,
+        hostBundleID: String? = nil,
+        requestsAuthorization: Bool = false
+    ) {
         self.title = title
         self.body = body
         // Normalized here so every consumer can treat presence as usable.
         self.hostBundleID = hostBundleID.flatMap { $0.isEmpty ? nil : $0 }
+        self.requestsAuthorization = requestsAuthorization
     }
 
     public func argumentList() -> [String] {
         var arguments = ["--title", title, "--body", body]
         if let hostBundleID {
             arguments += ["--host-bundle-id", hostBundleID]
+        }
+        if requestsAuthorization {
+            arguments.append(Self.requestAuthorizationArgument)
         }
         return arguments
     }
@@ -68,7 +80,50 @@ public struct NotifierCommand: Equatable, Sendable {
         return NotifierCommand(
             title: title,
             body: values["--body"] ?? "",
-            hostBundleID: values["--host-bundle-id"]
+            hostBundleID: values["--host-bundle-id"],
+            requestsAuthorization: arguments.contains(Self.requestAuthorizationArgument)
         )
+    }
+}
+
+public enum NotifierAuthorizationStatus: String, Equatable, Sendable {
+    case notDetermined
+    case denied
+    case authorized
+    case provisional
+    case ephemeral
+    case unknown
+
+    public init(_ status: UNAuthorizationStatus) {
+        switch status {
+        case .notDetermined: self = .notDetermined
+        case .denied: self = .denied
+        case .authorized: self = .authorized
+        case .provisional: self = .provisional
+        case .ephemeral: self = .ephemeral
+        @unknown default: self = .unknown
+        }
+    }
+}
+
+public enum NotifierAuthorizationAction: Equatable, Sendable {
+    case post
+    case request
+    case deny
+}
+
+public enum NotifierAuthorizationPolicy {
+    public static func action(
+        for status: NotifierAuthorizationStatus,
+        requestsAuthorization: Bool
+    ) -> NotifierAuthorizationAction {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return .post
+        case .notDetermined:
+            return requestsAuthorization ? .request : .deny
+        case .denied, .unknown:
+            return .deny
+        }
     }
 }
