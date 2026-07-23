@@ -38,6 +38,8 @@ import Testing
         #expect(snapshot.missing == .notSetUp)
         #expect(snapshot.outdated == .needsRepair)
         #expect(snapshot.invalid == .needsReview)
+        #expect(snapshot.needsTrustReview == .needsReview)
+        #expect(snapshot.trustUnknown == .trustUnknown)
     }
 
     @Test @MainActor func welcomeStatePersistsAndSuccessfulMutationRefreshesHealth() async {

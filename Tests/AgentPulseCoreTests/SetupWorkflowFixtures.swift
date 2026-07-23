@@ -31,6 +31,8 @@ struct SetupIntegrationStatesSnapshot {
     var missing: SetupIntegrationState
     var outdated: SetupIntegrationState
     var invalid: SetupIntegrationState
+    var needsTrustReview: SetupIntegrationState
+    var trustUnknown: SetupIntegrationState
 }
 
 struct SetupMutationSnapshot {
@@ -189,6 +191,22 @@ enum SetupWorkflowFixtures {
             invalid: SetupIntegrationStateResolver.state(
                 for: integration(host: available, hooks: .invalid("Malformed")),
                 bridge: .missing
+            ),
+            needsTrustReview: SetupIntegrationStateResolver.state(
+                for: integration(
+                    host: available,
+                    hooks: .current,
+                    hookTrust: .needsReview(untrusted: 6, modified: 0, total: 6)
+                ),
+                bridge: .current(version: "1.0.0")
+            ),
+            trustUnknown: SetupIntegrationStateResolver.state(
+                for: integration(
+                    host: available,
+                    hooks: .current,
+                    hookTrust: .unavailable("Unsupported protocol")
+                ),
+                bridge: .current(version: "1.0.0")
             )
         )
     }
@@ -461,12 +479,14 @@ enum SetupWorkflowFixtures {
     private static func integration(
         host: IntegrationHostHealth,
         hooks: HookConfigurationHealth,
+        hookTrust: HookTrustHealth = .notApplicable,
         lastEvent: LastIntegrationEventHealth = .never
     ) -> IntegrationHealthSnapshot {
         IntegrationHealthSnapshot(
             agent: .claude,
             host: host,
             hooks: hooks,
+            hookTrust: hookTrust,
             usage: .available,
             lastEvent: lastEvent,
             recommendedAction: .none

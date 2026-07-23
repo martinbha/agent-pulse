@@ -8,6 +8,7 @@ struct SetupHealthInspector {
     typealias BridgeProvider = () -> BridgeHealth
     typealias HostProvider = (AgentKind) async -> IntegrationHostHealth
     typealias HookProvider = (AgentKind) -> HookConfigurationHealth
+    typealias HookTrustProvider = (AgentKind) async -> HookTrustHealth
     typealias NotificationProvider = () async -> NotificationAuthorizationHealth
     typealias NotificationHelperProvider = (AgentKind) async -> NotificationAuthorizationHealth
     typealias LaunchAtLoginProvider = @MainActor () async -> LaunchAtLoginHealth
@@ -18,6 +19,7 @@ struct SetupHealthInspector {
     private let bridgeProvider: BridgeProvider
     private let hostProvider: HostProvider
     private let hookProvider: HookProvider
+    private let hookTrustProvider: HookTrustProvider
     private let notificationProvider: NotificationProvider
     private let notificationHelperProvider: NotificationHelperProvider
     private let launchAtLoginProvider: LaunchAtLoginProvider
@@ -29,6 +31,7 @@ struct SetupHealthInspector {
         bridgeProvider: @escaping BridgeProvider,
         hostProvider: @escaping HostProvider,
         hookProvider: @escaping HookProvider,
+        hookTrustProvider: @escaping HookTrustProvider = { _ in .notApplicable },
         notificationProvider: @escaping NotificationProvider,
         notificationHelperProvider: @escaping NotificationHelperProvider = {
             _ in .unavailable("Notification helper status is unavailable.")
@@ -41,6 +44,7 @@ struct SetupHealthInspector {
         self.bridgeProvider = bridgeProvider
         self.hostProvider = hostProvider
         self.hookProvider = hookProvider
+        self.hookTrustProvider = hookTrustProvider
         self.notificationProvider = notificationProvider
         self.notificationHelperProvider = notificationHelperProvider
         self.launchAtLoginProvider = launchAtLoginProvider
@@ -56,10 +60,12 @@ struct SetupHealthInspector {
 
         var hosts: [AgentKind: IntegrationHostHealth] = [:]
         var hooks: [AgentKind: HookConfigurationHealth] = [:]
+        var hookTrust: [AgentKind: HookTrustHealth] = [:]
         var notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:]
         for agent in AgentKind.allCases {
             hosts[agent] = await hostProvider(agent)
             hooks[agent] = hookProvider(agent)
+            hookTrust[agent] = await hookTrustProvider(agent)
             notificationHelpers[agent] = await notificationHelperProvider(agent)
         }
 
@@ -70,6 +76,7 @@ struct SetupHealthInspector {
             bridge: bridgeProvider(),
             hosts: hosts,
             hooks: hooks,
+            hookTrust: hookTrust,
             usage: usage,
             events: events,
             notifications: notifications,
@@ -122,6 +129,11 @@ struct SetupHealthInspector {
                 bundleURL: bundleURL,
                 fileManager: fileManager
             )
+        let codexHookTrustInspector = CodexHookTrustInspector.live(
+            workingDirectory: homeDirectory,
+            bridgeExecutableURL: bridgeInstaller.paths.installedExecutable,
+            fileManager: fileManager
+        )
 
         return SetupHealthInspector(
             now: now,
@@ -146,6 +158,15 @@ struct SetupHealthInspector {
                 case .codex:
                     return tomlHookHealth(from: tomlManager.preview(.install))
                 }
+            },
+            hookTrustProvider: { agent in
+                guard agent == .codex else {
+                    return .notApplicable
+                }
+                guard let codexHookTrustInspector else {
+                    return .unavailable("No compatible command-line executable was found.")
+                }
+                return await codexHookTrustInspector.inspect()
             },
             notificationProvider: {
                 await notificationPermissionService.mainHealth()

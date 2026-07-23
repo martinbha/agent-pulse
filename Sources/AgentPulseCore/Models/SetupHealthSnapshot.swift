@@ -55,6 +55,15 @@ enum HookConfigurationHealth: Equatable, Sendable {
     case invalid(String)
 }
 
+enum HookTrustHealth: Equatable, Sendable {
+    case notApplicable
+    case verified(trusted: Int, managed: Int, total: Int)
+    case needsReview(untrusted: Int, modified: Int, total: Int)
+    case disabled(disabled: Int, total: Int)
+    case missing(found: Int, expected: Int)
+    case unavailable(String)
+}
+
 enum SetupUsageHealth: Equatable, Sendable {
     case loading
     case available
@@ -97,6 +106,7 @@ enum SetupRecommendedAction: Equatable, Sendable {
     case installIntegration(AgentKind)
     case repairIntegration(AgentKind)
     case reviewIntegrationConfiguration(AgentKind)
+    case reviewHookTrust(AgentKind)
     case signIn(AgentKind)
     case testIntegration(AgentKind)
     case requestNotificationPermission
@@ -114,11 +124,30 @@ struct IntegrationHealthSnapshot: Equatable, Identifiable, Sendable {
     let agent: AgentKind
     let host: IntegrationHostHealth
     let hooks: HookConfigurationHealth
+    let hookTrust: HookTrustHealth
     let usage: SetupUsageHealth
     let lastEvent: LastIntegrationEventHealth
     let recommendedAction: SetupRecommendedAction
 
     var id: AgentKind { agent }
+
+    init(
+        agent: AgentKind,
+        host: IntegrationHostHealth,
+        hooks: HookConfigurationHealth,
+        hookTrust: HookTrustHealth = .notApplicable,
+        usage: SetupUsageHealth,
+        lastEvent: LastIntegrationEventHealth,
+        recommendedAction: SetupRecommendedAction
+    ) {
+        self.agent = agent
+        self.host = host
+        self.hooks = hooks
+        self.hookTrust = hookTrust
+        self.usage = usage
+        self.lastEvent = lastEvent
+        self.recommendedAction = recommendedAction
+    }
 }
 
 struct SetupHealthSnapshot: Equatable, Sendable {
@@ -172,6 +201,7 @@ enum SetupHealthClassifier {
         bridge: BridgeHealth,
         hosts: [AgentKind: IntegrationHostHealth],
         hooks: [AgentKind: HookConfigurationHealth],
+        hookTrust: [AgentKind: HookTrustHealth] = [:],
         usage: [AgentKind: UsageAvailability],
         events: [AgentKind: AgentStatusSnapshot],
         notifications: NotificationAuthorizationHealth,
@@ -187,12 +217,14 @@ enum SetupHealthClassifier {
                 agent: agent,
                 host: host,
                 hooks: hook,
+                hookTrust: hookTrust[agent] ?? .notApplicable,
                 usage: availability,
                 lastEvent: lastEvent,
                 recommendedAction: integrationAction(
                     agent: agent,
                     host: host,
                     hooks: hook,
+                    hookTrust: hookTrust[agent] ?? .notApplicable,
                     usage: availability,
                     lastEvent: lastEvent
                 )
@@ -298,6 +330,17 @@ enum SetupHealthClassifier {
             }
         }
 
+        if let trustReview = integrations.first(where: { integration in
+            switch integration.hookTrust {
+            case .needsReview, .disabled, .missing, .unavailable:
+                return true
+            case .notApplicable, .verified:
+                return false
+            }
+        }) {
+            return (.reviewHookTrust(trustReview.agent), nil)
+        }
+
         if let action = integrations.map(\.recommendedAction).first(where: { $0 != .none }) {
             return (action, nil)
         }
@@ -324,6 +367,7 @@ enum SetupHealthClassifier {
         agent: AgentKind,
         host: IntegrationHostHealth,
         hooks: HookConfigurationHealth,
+        hookTrust: HookTrustHealth,
         usage: SetupUsageHealth,
         lastEvent: LastIntegrationEventHealth
     ) -> SetupRecommendedAction {
@@ -339,6 +383,12 @@ enum SetupHealthClassifier {
         case .outdated, .duplicated:
             return .repairIntegration(agent)
         case .current, .invalid:
+            break
+        }
+        switch hookTrust {
+        case .needsReview, .disabled, .missing, .unavailable:
+            return .reviewHookTrust(agent)
+        case .notApplicable, .verified:
             break
         }
         switch usage {
@@ -405,6 +455,7 @@ enum SetupHealthDiagnosticsRenderer {
             lines.append(
                 "\(integration.agent.displayName): host \(hostSummary(integration.host)); "
                     + "hooks \(hookSummary(integration.hooks)); "
+                    + "hook trust \(hookTrustSummary(integration.hookTrust)); "
                     + "usage \(usageSummary(integration.usage)); "
                     + "last event \(eventSummary(integration.lastEvent))"
             )
@@ -477,6 +528,23 @@ enum SetupHealthDiagnosticsRenderer {
         }
     }
 
+    private static func hookTrustSummary(_ health: HookTrustHealth) -> String {
+        switch health {
+        case .notApplicable:
+            return "not applicable"
+        case .verified(let trusted, let managed, let total):
+            return "verified (\(trusted) trusted, \(managed) managed, \(total) total)"
+        case .needsReview(let untrusted, let modified, let total):
+            return "needs review (\(untrusted) untrusted, \(modified) modified, \(total) total)"
+        case .disabled(let disabled, let total):
+            return "disabled (\(disabled) of \(total))"
+        case .missing(let found, let expected):
+            return "incomplete (\(found) of \(expected))"
+        case .unavailable(let reason):
+            return "unavailable: \(reason)"
+        }
+    }
+
     private static func usageSummary(_ availability: SetupUsageHealth) -> String {
         switch availability {
         case .loading: return "loading"
@@ -530,6 +598,7 @@ enum SetupHealthDiagnosticsRenderer {
         case .repairIntegration(let agent): return "repair \(agent.displayName) integration"
         case .reviewIntegrationConfiguration(let agent):
             return "review \(agent.displayName) configuration"
+        case .reviewHookTrust(let agent): return "review \(agent.displayName) hook approval"
         case .signIn(let agent): return "sign in to \(agent.displayName)"
         case .testIntegration(let agent): return "test \(agent.displayName) integration"
         case .requestNotificationPermission: return "request notification permission"

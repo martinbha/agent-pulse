@@ -49,10 +49,12 @@ open "$HOME/Applications/Agent Pulse.app"
 This source-built bundle is signed locally rather than notarized for download.
 On first launch, Agent Pulse opens Settings automatically. Each detected tool has
 its own status card; choose **Set Up** to install the local bridge and configure
-that tool without editing files or running additional shell commands. Choose
-**Test** afterward to verify correlated delivery without changing the normal
-agent status or sending an event notification. Settings is always available
-from the menu-bar dropdown.
+that tool without editing files or running additional shell commands. The Codex
+card separately reports configuration, hook approval, and the last live event.
+Choose **Test Bridge** to verify only the authenticated local bridge path without
+changing normal agent status or sending an event notification. A real task event
+is still required to verify that the host loaded and executed the hooks. Settings
+is always available from the menu-bar dropdown.
 
 ## Development
 

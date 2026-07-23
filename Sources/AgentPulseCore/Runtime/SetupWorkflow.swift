@@ -33,7 +33,7 @@ enum SetupOperation: Equatable {
         case .testNotification: return "Send Test"
         case .setUp: return "Set Up"
         case .repair: return "Repair"
-        case .test: return "Test"
+        case .test: return "Test Bridge"
         case .remove: return "Remove"
         }
     }
@@ -86,7 +86,8 @@ enum SetupPresentationPolicy {
              .restartLocalServer,
              .repairBridge,
              .repairIntegration,
-             .reviewIntegrationConfiguration:
+             .reviewIntegrationConfiguration,
+             .reviewHookTrust:
             return true
         case .installBridge:
             return snapshot.integrations.contains { integration in
@@ -143,6 +144,7 @@ enum SetupIntegrationState: Equatable {
     case notSetUp
     case needsRepair
     case needsReview
+    case trustUnknown
 }
 
 enum SetupIntegrationStateResolver {
@@ -166,6 +168,14 @@ enum SetupIntegrationStateResolver {
         }
         guard case .available = integration.host else {
             return .hostUnavailable
+        }
+        switch integration.hookTrust {
+        case .needsReview, .disabled, .missing:
+            return .needsReview
+        case .unavailable:
+            return .trustUnknown
+        case .notApplicable, .verified:
+            break
         }
         if case .never = integration.lastEvent {
             return .waitingForEvent
@@ -446,7 +456,7 @@ struct SetupMutationExecutor {
                     )
                     _ = try await runner.run(integration: agent.rawValue)
                     return SetupOperationReport(
-                        message: "\(agent.displayName) delivered a correlated test event successfully."
+                        message: "\(agent.displayName)'s bridge accepted a correlated diagnostic event. This does not verify hook approval or live delivery."
                     )
                 } catch let failure as BridgeSelfTestFailure {
                     throw SetupOperationFailure(
