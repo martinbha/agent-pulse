@@ -25,6 +25,7 @@ struct SetupTransitionSnapshot {
     var removedHooksAction: SetupRecommendedAction
     var signInAction: SetupRecommendedAction
     var testAction: SetupRecommendedAction
+    var hookTrustAction: SetupRecommendedAction
     var notificationAction: SetupRecommendedAction
     var helperNotificationAction: SetupRecommendedAction
     var deniedHelperNotificationAction: SetupRecommendedAction
@@ -125,6 +126,7 @@ enum SetupHealthFixtures {
             bridge: BridgeHealth? = nil,
             hosts overrideHosts: [AgentKind: IntegrationHostHealth]? = nil,
             hooks: [AgentKind: HookConfigurationHealth]? = nil,
+            hookTrust: [AgentKind: HookTrustHealth] = [:],
             usage: [AgentKind: UsageAvailability]? = nil,
             events overrideEvents: [AgentKind: AgentStatusSnapshot]? = nil,
             notifications: NotificationAuthorizationHealth = .authorized,
@@ -138,6 +140,7 @@ enum SetupHealthFixtures {
                 bridge: bridge ?? currentBridge,
                 hosts: overrideHosts ?? hosts,
                 hooks: hooks ?? currentHooks,
+                hookTrust: hookTrust,
                 usage: usage ?? availableUsage,
                 events: overrideEvents ?? events,
                 notifications: notifications,
@@ -158,6 +161,9 @@ enum SetupHealthFixtures {
         missingAuth[.claude] = .missingAuth
         var missingEvent = events
         missingEvent[.claude] = .idle(agent: .claude)
+        let untrustedHooks: [AgentKind: HookTrustHealth] = [
+            .codex: .needsReview(untrusted: 6, modified: 0, total: 6),
+        ]
 
         let complete = snapshot()
         let unsafe = snapshot(hosts: oneHostMissing, hooks: invalidHooks)
@@ -184,6 +190,7 @@ enum SetupHealthFixtures {
             removedHooksAction: snapshot(hooks: removedHooks).recommendedAction,
             signInAction: snapshot(usage: missingAuth).recommendedAction,
             testAction: snapshot(events: missingEvent).recommendedAction,
+            hookTrustAction: snapshot(hookTrust: untrustedHooks).recommendedAction,
             notificationAction: snapshot(notifications: .notDetermined).recommendedAction,
             helperNotificationAction: snapshot(
                 notificationHelpers: [

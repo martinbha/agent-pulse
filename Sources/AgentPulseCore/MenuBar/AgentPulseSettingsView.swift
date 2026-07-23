@@ -410,12 +410,19 @@ struct AgentPulseSettingsView: View {
                     icon: usageIcon(integration.usage)
                 )
                 statusRow(
-                    "Hooks",
+                    "Hook config",
                     hookLabel(integration.hooks),
                     icon: hookIcon(integration.hooks)
                 )
+                if integration.hookTrust != .notApplicable {
+                    statusRow(
+                        "Hook approval",
+                        hookTrustLabel(integration.hookTrust),
+                        icon: hookTrustIcon(integration.hookTrust)
+                    )
+                }
                 statusRow(
-                    "Last event",
+                    "Live delivery",
                     eventLabel(integration.lastEvent),
                     icon: eventIcon(integration.lastEvent)
                 )
@@ -581,6 +588,8 @@ struct AgentPulseSettingsView: View {
             Button("Show Configuration") {
                 revealConfiguration(for: agent)
             }
+        case .reviewHookTrust:
+            EmptyView()
         case .restartLocalServer:
             Button("Quit Agent Pulse") {
                 NSApplication.shared.terminate(nil)
@@ -678,6 +687,7 @@ struct AgentPulseSettingsView: View {
         case .installIntegration(let agent): return "Set up \(agent.displayName) when you want its work status in the menu bar."
         case .repairIntegration(let agent): return "Repair the existing \(agent.displayName) hooks to match this version."
         case .reviewIntegrationConfiguration(let agent): return "Review the existing \(agent.displayName) configuration before changing it."
+        case .reviewHookTrust(let agent): return "Review \(agent.displayName)'s current hook approval before relying on live status updates."
         case .signIn(let agent): return "Sign in to \(agent.displayName) to display usage."
         case .testIntegration(let agent): return "Use \(agent.displayName) once, then refresh to confirm its first hook event."
         case .requestNotificationPermission: return "Notifications can be enabled later when you first need them."
@@ -692,13 +702,31 @@ struct AgentPulseSettingsView: View {
     }
 
     private func integrationGuidance(_ integration: IntegrationHealthSnapshot) -> String? {
+        switch integration.hookTrust {
+        case .verified where integration.lastEvent == .never:
+            return "The current hooks are approved, but no real event has arrived. Start a new task or send a prompt, then refresh to verify live delivery."
+        case .needsReview(let untrusted, let modified, _):
+            let reason = modified > 0
+                ? "\(modified) changed hook\(modified == 1 ? "" : "s")"
+                : "\(untrusted) unreviewed hook\(untrusted == 1 ? "" : "s")"
+            return "\(reason.capitalized) will be skipped. Open the CLI, run /hooks, and review the exact definitions before approving them."
+        case .disabled(let disabled, _):
+            return "\(disabled) hook\(disabled == 1 ? " is" : "s are") disabled. Open the CLI and run /hooks to review the current hook settings."
+        case .missing(let found, let expected):
+            return "The client discovered only \(found) of \(expected) expected hooks. Repair the integration, then recheck approval."
+        case .unavailable(let reason):
+            return "Hook approval could not be checked safely: \(reason)"
+        case .notApplicable, .verified:
+            break
+        }
+
         switch integration.recommendedAction {
         case .installHost:
             return "Install \(integration.agent.displayName), then refresh this window."
         case .signIn:
             return "Sign in through \(integration.agent.displayName), then refresh usage."
         case .testIntegration:
-            return "No hook event has arrived yet. Run Test to verify delivery without creating a normal status or notification."
+            return "No real hook event has arrived yet. Test Bridge checks only the local bridge; start a new task or send a prompt to verify live delivery."
         case .reviewIntegrationConfiguration:
             if case .invalid(let reason) = integration.hooks {
                 return "Agent Pulse left this configuration unchanged: \(reason)"
@@ -721,6 +749,7 @@ struct AgentPulseSettingsView: View {
         case .notSetUp: return "Not set up"
         case .needsRepair: return "Needs repair"
         case .needsReview: return "Needs review"
+        case .trustUnknown: return "Approval unknown"
         }
     }
 
@@ -731,7 +760,7 @@ struct AgentPulseSettingsView: View {
         switch SetupIntegrationStateResolver.state(for: integration, bridge: bridge) {
         case .connected: return .good
         case .waitingForEvent, .notSetUp, .hostUnavailable: return .neutral
-        case .bridgeUnavailable, .needsRepair: return .warning
+        case .bridgeUnavailable, .needsRepair, .trustUnknown: return .warning
         case .needsReview: return .bad
         }
     }
@@ -836,6 +865,38 @@ struct AgentPulseSettingsView: View {
         case .missing: return "minus.circle"
         case .outdated, .duplicated: return "exclamationmark.triangle.fill"
         case .invalid: return "xmark.octagon.fill"
+        }
+    }
+
+    private func hookTrustLabel(_ health: HookTrustHealth) -> String {
+        switch health {
+        case .notApplicable: return "Not required"
+        case .verified(let trusted, let managed, let total):
+            if managed == total {
+                return "Managed · \(total)/\(total)"
+            }
+            return "Trusted · \(trusted + managed)/\(total)"
+        case .needsReview(let untrusted, let modified, _):
+            if modified > 0 {
+                return "Changed · \(modified) need review"
+            }
+            return "Unreviewed · \(untrusted) need review"
+        case .disabled(let disabled, let total):
+            return "Disabled · \(disabled)/\(total)"
+        case .missing(let found, let expected):
+            return "Incomplete · \(found)/\(expected)"
+        case .unavailable:
+            return "Unknown"
+        }
+    }
+
+    private func hookTrustIcon(_ health: HookTrustHealth) -> String {
+        switch health {
+        case .verified: return "checkmark.shield.fill"
+        case .needsReview: return "exclamationmark.shield.fill"
+        case .disabled, .missing: return "exclamationmark.triangle.fill"
+        case .unavailable: return "questionmark.circle"
+        case .notApplicable: return "minus.circle"
         }
     }
 

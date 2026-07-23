@@ -2,17 +2,18 @@
 
 Agent Pulse receives events from Claude Code and Codex through a small native bridge.
 
-For normal installation, open **Setup** from the Agent Pulse menu and select
+For normal installation, open **Settings** from the Agent Pulse menu and select
 **Set Up** on each tool you want to connect. Agent Pulse installs the bridge,
 backs up an existing configuration before changing it, preserves unrelated
 settings, and refreshes the displayed health after each operation. No manual
 configuration editing is required.
 
-After setup, select **Test** on an integration card to run the installed bridge
+After setup, select **Test Bridge** on an integration card to run the installed bridge
 with a uniquely correlated event. The app verifies delivery through its
 authenticated local state endpoint, reports the exact failing stage when the
 test does not pass, and refreshes setup health afterward. Self-test events do
 not change the displayed agent state or produce normal event notifications.
+They also do not prove that a host has approved or executed its configured hooks.
 
 The details below are a development and troubleshooting reference for the
 files managed by Setup.
@@ -158,6 +159,21 @@ Add hooks to `~/.claude/settings.json`.
 
 Add hooks to `~/.codex/config.toml`.
 
+Settings asks the installed client for its current hook status through the
+read-only `hooks/list` app-server request. The integration card reports hook
+configuration, approval, and live delivery separately:
+
+- **Trusted** or **Managed** means the current definitions are allowed to run.
+- **Unreviewed** or **Changed** means the client will skip one or more hooks
+  until they are reviewed with `/hooks`.
+- **Unknown** means the status could not be queried safely; it is not treated
+  as approval.
+- **Live delivery** is verified only after a normal task event reaches Agent
+  Pulse.
+
+Agent Pulse never writes hook trust records, approves definitions, or bypasses
+the host's trust requirement.
+
 ```toml
 # BEGIN agent-pulse
 [[hooks.SessionStart]]
@@ -213,7 +229,7 @@ Pulse owns the marker-delimited block and leaves all other TOML content intact.
 
 ## Delivery diagnostics
 
-The **Test** button in Settings is the preferred delivery check. For a
+The **Test Bridge** button in Settings is the preferred bridge check. For a
 terminal-based diagnostic, keep Agent Pulse running and execute:
 
 ```bash

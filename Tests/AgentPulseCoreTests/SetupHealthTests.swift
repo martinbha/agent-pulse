@@ -45,6 +45,7 @@ import Testing
         #expect(snapshot.removedHooksAction == .installIntegration(.codex))
         #expect(snapshot.signInAction == .signIn(.claude))
         #expect(snapshot.testAction == .testIntegration(.claude))
+        #expect(snapshot.hookTrustAction == .reviewHookTrust(.codex))
         #expect(snapshot.notificationAction == .requestNotificationPermission)
         #expect(snapshot.helperNotificationAction == .requestNotificationPermission)
         #expect(snapshot.deniedHelperNotificationAction == .openNotificationSettings)

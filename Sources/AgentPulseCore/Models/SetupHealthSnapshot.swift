@@ -106,6 +106,7 @@ enum SetupRecommendedAction: Equatable, Sendable {
     case installIntegration(AgentKind)
     case repairIntegration(AgentKind)
     case reviewIntegrationConfiguration(AgentKind)
+    case reviewHookTrust(AgentKind)
     case signIn(AgentKind)
     case testIntegration(AgentKind)
     case requestNotificationPermission
@@ -223,6 +224,7 @@ enum SetupHealthClassifier {
                     agent: agent,
                     host: host,
                     hooks: hook,
+                    hookTrust: hookTrust[agent] ?? .notApplicable,
                     usage: availability,
                     lastEvent: lastEvent
                 )
@@ -328,6 +330,17 @@ enum SetupHealthClassifier {
             }
         }
 
+        if let trustReview = integrations.first(where: { integration in
+            switch integration.hookTrust {
+            case .needsReview, .disabled, .missing, .unavailable:
+                return true
+            case .notApplicable, .verified:
+                return false
+            }
+        }) {
+            return (.reviewHookTrust(trustReview.agent), nil)
+        }
+
         if let action = integrations.map(\.recommendedAction).first(where: { $0 != .none }) {
             return (action, nil)
         }
@@ -354,6 +367,7 @@ enum SetupHealthClassifier {
         agent: AgentKind,
         host: IntegrationHostHealth,
         hooks: HookConfigurationHealth,
+        hookTrust: HookTrustHealth,
         usage: SetupUsageHealth,
         lastEvent: LastIntegrationEventHealth
     ) -> SetupRecommendedAction {
@@ -369,6 +383,12 @@ enum SetupHealthClassifier {
         case .outdated, .duplicated:
             return .repairIntegration(agent)
         case .current, .invalid:
+            break
+        }
+        switch hookTrust {
+        case .needsReview, .disabled, .missing, .unavailable:
+            return .reviewHookTrust(agent)
+        case .notApplicable, .verified:
             break
         }
         switch usage {
@@ -578,6 +598,7 @@ enum SetupHealthDiagnosticsRenderer {
         case .repairIntegration(let agent): return "repair \(agent.displayName) integration"
         case .reviewIntegrationConfiguration(let agent):
             return "review \(agent.displayName) configuration"
+        case .reviewHookTrust(let agent): return "review \(agent.displayName) hook approval"
         case .signIn(let agent): return "sign in to \(agent.displayName)"
         case .testIntegration(let agent): return "test \(agent.displayName) integration"
         case .requestNotificationPermission: return "request notification permission"
