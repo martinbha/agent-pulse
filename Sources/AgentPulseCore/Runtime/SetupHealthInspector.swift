@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import ServiceManagement
 import UserNotifications
 
 struct SetupHealthInspector {
@@ -10,7 +9,7 @@ struct SetupHealthInspector {
     typealias HostProvider = (AgentKind) async -> IntegrationHostHealth
     typealias HookProvider = (AgentKind) -> HookConfigurationHealth
     typealias NotificationProvider = () async -> NotificationAuthorizationHealth
-    typealias LaunchAtLoginProvider = () async -> LaunchAtLoginHealth
+    typealias LaunchAtLoginProvider = @MainActor () async -> LaunchAtLoginHealth
 
     private let now: () -> Date
     private let applicationProvider: ApplicationProvider
@@ -70,12 +69,14 @@ struct SetupHealthInspector {
         )
     }
 
+    @MainActor
     static func live(
         endpoint: URL,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default,
         notificationCenter: UNUserNotificationCenter = .current(),
+        launchAtLoginService: LaunchAtLoginService? = nil,
         now: @escaping () -> Date = Date.init
     ) -> SetupHealthInspector {
         let bridgeInstaller = BridgeInstaller(
@@ -100,6 +101,10 @@ struct SetupHealthInspector {
         let application = SetupHealthClassifier.applicationLocation(
             bundleURL: bundleURL,
             homeDirectory: homeDirectory
+        )
+        let launchAtLoginService = launchAtLoginService ?? LaunchAtLoginService.live(
+            homeDirectory: homeDirectory,
+            bundleURL: bundleURL
         )
 
         return SetupHealthInspector(
@@ -130,7 +135,7 @@ struct SetupHealthInspector {
                 await notificationHealth(center: notificationCenter)
             },
             launchAtLoginProvider: {
-                await launchAtLoginHealth(application: application)
+                launchAtLoginService.health
             }
         )
     }
@@ -325,22 +330,6 @@ struct SetupHealthInspector {
         case .provisional: return .provisional
         case .ephemeral: return .ephemeral
         @unknown default: return .unavailable("Unknown notification authorization state.")
-        }
-    }
-
-    @MainActor
-    private static func launchAtLoginHealth(
-        application: ApplicationLocationHealth
-    ) -> LaunchAtLoginHealth {
-        if case .unbundled = application {
-            return .unavailable("Launch at Login requires an application bundle.")
-        }
-        switch SMAppService.mainApp.status {
-        case .notRegistered: return .notRegistered
-        case .enabled: return .enabled
-        case .requiresApproval: return .requiresApproval
-        case .notFound: return .notFound
-        @unknown default: return .unavailable("Unknown Launch at Login state.")
         }
     }
 

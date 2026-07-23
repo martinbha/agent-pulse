@@ -16,6 +16,15 @@ public final class AgentPulseAppDelegate: NSObject, NSApplicationDelegate {
         NSLog("Agent Pulse started with endpoint \(runtime.endpoint)")
     }
 
+    public func applicationDidBecomeActive(_ notification: Notification) {
+        guard let runtime else {
+            return
+        }
+        Task {
+            await runtime.setup.refresh()
+        }
+    }
+
     public func applicationWillTerminate(_ notification: Notification) {
         NSLog("Agent Pulse stopped")
     }
