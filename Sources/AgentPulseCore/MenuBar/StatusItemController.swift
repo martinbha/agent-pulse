@@ -447,8 +447,9 @@ final class StatusItemController: NSObject {
             backing: .buffered,
             defer: false
         )
-        window.center()
         window.contentViewController = hostingController
+        window.setContentSize(NSSize(width: 700, height: 640))
+        window.center()
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 640, height: 540)
         window.title = "Agent Pulse Settings"
