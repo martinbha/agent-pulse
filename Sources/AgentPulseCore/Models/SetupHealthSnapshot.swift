@@ -55,6 +55,15 @@ enum HookConfigurationHealth: Equatable, Sendable {
     case invalid(String)
 }
 
+enum HookTrustHealth: Equatable, Sendable {
+    case notApplicable
+    case verified(trusted: Int, managed: Int, total: Int)
+    case needsReview(untrusted: Int, modified: Int, total: Int)
+    case disabled(disabled: Int, total: Int)
+    case missing(found: Int, expected: Int)
+    case unavailable(String)
+}
+
 enum SetupUsageHealth: Equatable, Sendable {
     case loading
     case available
@@ -114,11 +123,30 @@ struct IntegrationHealthSnapshot: Equatable, Identifiable, Sendable {
     let agent: AgentKind
     let host: IntegrationHostHealth
     let hooks: HookConfigurationHealth
+    let hookTrust: HookTrustHealth
     let usage: SetupUsageHealth
     let lastEvent: LastIntegrationEventHealth
     let recommendedAction: SetupRecommendedAction
 
     var id: AgentKind { agent }
+
+    init(
+        agent: AgentKind,
+        host: IntegrationHostHealth,
+        hooks: HookConfigurationHealth,
+        hookTrust: HookTrustHealth = .notApplicable,
+        usage: SetupUsageHealth,
+        lastEvent: LastIntegrationEventHealth,
+        recommendedAction: SetupRecommendedAction
+    ) {
+        self.agent = agent
+        self.host = host
+        self.hooks = hooks
+        self.hookTrust = hookTrust
+        self.usage = usage
+        self.lastEvent = lastEvent
+        self.recommendedAction = recommendedAction
+    }
 }
 
 struct SetupHealthSnapshot: Equatable, Sendable {
@@ -172,6 +200,7 @@ enum SetupHealthClassifier {
         bridge: BridgeHealth,
         hosts: [AgentKind: IntegrationHostHealth],
         hooks: [AgentKind: HookConfigurationHealth],
+        hookTrust: [AgentKind: HookTrustHealth] = [:],
         usage: [AgentKind: UsageAvailability],
         events: [AgentKind: AgentStatusSnapshot],
         notifications: NotificationAuthorizationHealth,
@@ -187,6 +216,7 @@ enum SetupHealthClassifier {
                 agent: agent,
                 host: host,
                 hooks: hook,
+                hookTrust: hookTrust[agent] ?? .notApplicable,
                 usage: availability,
                 lastEvent: lastEvent,
                 recommendedAction: integrationAction(
@@ -405,6 +435,7 @@ enum SetupHealthDiagnosticsRenderer {
             lines.append(
                 "\(integration.agent.displayName): host \(hostSummary(integration.host)); "
                     + "hooks \(hookSummary(integration.hooks)); "
+                    + "hook trust \(hookTrustSummary(integration.hookTrust)); "
                     + "usage \(usageSummary(integration.usage)); "
                     + "last event \(eventSummary(integration.lastEvent))"
             )
@@ -474,6 +505,23 @@ enum SetupHealthDiagnosticsRenderer {
         case .outdated: return "outdated"
         case .duplicated(let count): return "duplicated (\(count) owned entries)"
         case .invalid(let reason): return "invalid: \(reason)"
+        }
+    }
+
+    private static func hookTrustSummary(_ health: HookTrustHealth) -> String {
+        switch health {
+        case .notApplicable:
+            return "not applicable"
+        case .verified(let trusted, let managed, let total):
+            return "verified (\(trusted) trusted, \(managed) managed, \(total) total)"
+        case .needsReview(let untrusted, let modified, let total):
+            return "needs review (\(untrusted) untrusted, \(modified) modified, \(total) total)"
+        case .disabled(let disabled, let total):
+            return "disabled (\(disabled) of \(total))"
+        case .missing(let found, let expected):
+            return "incomplete (\(found) of \(expected))"
+        case .unavailable(let reason):
+            return "unavailable: \(reason)"
         }
     }
 
