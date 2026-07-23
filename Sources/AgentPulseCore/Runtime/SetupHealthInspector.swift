@@ -121,7 +121,7 @@ struct SetupHealthInspector {
                 }
             },
             hostProvider: { agent in
-                await hostHealth(for: agent, homeDirectory: homeDirectory)
+                hostHealth(for: agent, homeDirectory: homeDirectory)
             },
             hookProvider: { agent in
                 switch agent {
