@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-struct SetupView: View {
+struct AgentPulseSettingsView: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var workflow: SetupWorkflow
     @State private var pendingRemovalAgent: AgentKind?
@@ -21,6 +21,11 @@ struct SetupView: View {
 
                     if let snapshot = workflow.snapshot {
                         setupSummary(snapshot)
+                    }
+
+                    preferencesSection
+
+                    if let snapshot = workflow.snapshot {
                         bridgeCard(snapshot)
                         launchAtLoginCard()
                         notificationsCard(snapshot)
@@ -49,7 +54,9 @@ struct SetupView: View {
         .frame(minWidth: 640, idealWidth: 700, minHeight: 540, idealHeight: 640)
         .agentPulseFont(size: 13)
         .task {
-            await workflow.refresh()
+            if workflow.snapshot == nil {
+                await workflow.refresh()
+            }
         }
         .confirmationDialog(
             "Remove this integration?",
@@ -86,9 +93,12 @@ struct SetupView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Set Up Agent Pulse")
+                Text("Agent Pulse Settings")
                     .agentPulseFont(size: 22)
-                Text("Connect your local coding tools without editing configuration files.")
+                Text("Manage integrations, notifications, and app preferences.")
+                    .foregroundStyle(.secondary)
+                Text(runtime.serverStatus)
+                    .agentPulseFont(size: 11)
                     .foregroundStyle(.secondary)
             }
 
@@ -116,6 +126,87 @@ struct SetupView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 260)
+    }
+
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preferences")
+                .agentPulseFont(size: 18)
+
+            UsageRefreshSettings(usageStore: runtime.usageStore)
+                .setupCard()
+
+            BrandColorSettings(appearance: runtime.appearance)
+                .setupCard()
+
+            overlayShortcutCard
+            previewEventsCard
+        }
+    }
+
+    private var overlayShortcutCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Overlay Shortcut")
+                .agentPulseFont(size: 15)
+
+            HStack {
+                Text("Toggle pinned overlay")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                HotkeyRecorder(settings: runtime.hotkeySettings)
+            }
+            .agentPulseFont(size: 12)
+        }
+        .setupCard()
+    }
+
+    private var previewEventsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Preview Events")
+                .agentPulseFont(size: 15)
+
+            Text("Preview working and completed states without waiting for a tool event.")
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Button {
+                    runtime.sendTestEvent(agent: .claude)
+                } label: {
+                    Label("Start Claude", systemImage: "play.circle")
+                }
+
+                Button {
+                    runtime.sendTestEvent(agent: .codex)
+                } label: {
+                    Label("Start Codex", systemImage: "play.circle")
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    runtime.stopTestEvent(agent: .claude)
+                } label: {
+                    Label("Stop Claude", systemImage: "stop.circle")
+                }
+
+                Button {
+                    runtime.stopTestEvent(agent: .codex)
+                } label: {
+                    Label("Stop Codex", systemImage: "stop.circle")
+                }
+
+                Spacer()
+
+                Button {
+                    runtime.clearCompleted()
+                } label: {
+                    Label("Clear", systemImage: "checkmark.circle")
+                }
+            }
+        }
+        .setupCard()
     }
 
     @ViewBuilder
