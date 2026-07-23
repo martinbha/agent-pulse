@@ -9,7 +9,8 @@ import UserNotifications
 /// banner's sender icon is that agent's logo.
 final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let center = UNUserNotificationCenter.current()
-    private let command = NotifierCommand.parse(Array(CommandLine.arguments.dropFirst()))
+    private let arguments = Array(CommandLine.arguments.dropFirst())
+    private lazy var command = NotifierCommand.parse(arguments)
     private var exitWorkItem: DispatchWorkItem?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -21,11 +22,17 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
     func applicationDidFinishLaunching(_ notification: Notification) {
         removeStaleDeliveredNotifications()
 
+        if arguments.contains(NotifierCommand.authorizationStatusArgument) {
+            reportAuthorizationStatus()
+            scheduleExit(after: 2)
+            return
+        }
+
         if let command {
             post(command)
             // Normal posting exits well before this; the deadline covers an
             // unanswered first-run permission prompt holding the process open.
-            scheduleExit(after: NotificationTiming.posterDeadline)
+            scheduleExit(after: NotificationTiming.posterDeadline, status: 3)
         } else {
             // Launched for a notification interaction; didReceive arrives
             // right away and cancels this deadline while it works.
@@ -35,8 +42,8 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
 
     /// The deadline is cancellable so an in-flight click handler is never
     /// torn down mid-open.
-    private func scheduleExit(after delay: TimeInterval) {
-        let work = DispatchWorkItem { exit(0) }
+    private func scheduleExit(after delay: TimeInterval, status: Int32 = 0) {
+        let work = DispatchWorkItem { exit(status) }
         exitWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
@@ -70,39 +77,68 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
 
     // Exit codes surfaced to the main app: 2 = no permission, 1 = post failed.
     private func post(_ command: NotifierCommand) {
-        center.requestAuthorization(options: [.alert, .sound]) { [center] granted, error in
+        center.getNotificationSettings { [center] settings in
+            let status = NotifierAuthorizationStatus(settings.authorizationStatus)
+            switch NotifierAuthorizationPolicy.action(
+                for: status,
+                requestsAuthorization: command.requestsAuthorization
+            ) {
+            case .post:
+                self.postAuthorized(command)
+            case .request:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                    if let error {
+                        NSLog(
+                            "Agent Pulse notifier authorization failed: %@",
+                            error.localizedDescription
+                        )
+                        exit(2)
+                    }
+                    guard granted else {
+                        NSLog("Agent Pulse notifier notifications were not granted")
+                        exit(2)
+                    }
+                    self.postAuthorized(command)
+                }
+            case .deny:
+                NSLog("Agent Pulse notifier notifications are not authorized")
+                exit(2)
+            }
+        }
+    }
+
+    private func postAuthorized(_ command: NotifierCommand) {
+        let request = UNNotificationRequest(
+            identifier: "agent-pulse-\(UUID().uuidString)",
+            content: command.makeNotificationContent(),
+            trigger: nil
+        )
+
+        center.add(request) { [center] error in
             if let error {
-                NSLog("Agent Pulse notifier authorization failed: %@", error.localizedDescription)
-                exit(2)
-            }
-            guard granted else {
-                NSLog("Agent Pulse notifier notifications were not granted")
-                exit(2)
+                NSLog("Agent Pulse notifier failed to post: %@", error.localizedDescription)
+                exit(1)
             }
 
-            let request = UNNotificationRequest(
-                identifier: "agent-pulse-\(UUID().uuidString)",
-                content: command.makeNotificationContent(),
-                trigger: nil
-            )
-
-            center.add(request) { error in
-                if let error {
-                    NSLog("Agent Pulse notifier failed to post: %@", error.localizedDescription)
-                    exit(1)
-                }
-
-                let queue = DispatchQueue.global()
-                queue.asyncAfter(deadline: .now() + NotificationTiming.bannerDismissalDelay) {
-                    center.removeDeliveredNotifications(withIdentifiers: [request.identifier])
-                }
-                queue.asyncAfter(
-                    deadline: .now() + NotificationTiming.bannerDismissalDelay
-                        + NotificationTiming.posterExitGrace
-                ) {
-                    exit(0)
-                }
+            let queue = DispatchQueue.global()
+            queue.asyncAfter(deadline: .now() + NotificationTiming.bannerDismissalDelay) {
+                center.removeDeliveredNotifications(withIdentifiers: [request.identifier])
             }
+            queue.asyncAfter(
+                deadline: .now() + NotificationTiming.bannerDismissalDelay
+                    + NotificationTiming.posterExitGrace
+            ) {
+                exit(0)
+            }
+        }
+    }
+
+    private func reportAuthorizationStatus() {
+        center.getNotificationSettings { settings in
+            let status = NotifierAuthorizationStatus(settings.authorizationStatus)
+            print(status.rawValue)
+            fflush(stdout)
+            exit(0)
         }
     }
 

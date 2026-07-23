@@ -70,6 +70,22 @@ import Testing
         #expect(snapshot.noticeMessage == "Delivery verified")
     }
 
+    @Test @MainActor func notificationTestResultRemainsAvailableAndRefreshesHealth() async {
+        let snapshot = await SetupWorkflowFixtures.successfulNotificationTest()
+
+        #expect(snapshot.executed == [.testNotification(.claude)])
+        #expect(snapshot.inspectionCount == 1)
+        #expect(snapshot.noticeKind == .success)
+        #expect(snapshot.noticeMessage == "Notification delivered")
+    }
+
+    @Test @MainActor func externalRefreshClearsNotificationMutationNotice() async {
+        let snapshot = await SetupWorkflowFixtures.notificationNoticeLifecycle()
+
+        #expect(snapshot.noticeAfterOperation?.kind == .success)
+        #expect(snapshot.noticeAfterExternalRefresh == nil)
+    }
+
     @Test @MainActor func externalRefreshClearsLaunchAtLoginMutationNotice() async {
         let snapshot = await SetupWorkflowFixtures.launchAtLoginNoticeLifecycle()
 

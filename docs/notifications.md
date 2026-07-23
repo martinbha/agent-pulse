@@ -20,10 +20,13 @@ posts it under its own identity, so the banner's sender icon is the agent
 logo. Because the logo is the sender icon rather than an attachment
 thumbnail, hovering the banner does not reflow anything.
 
-Each helper asks for notification permission once on first use and appears as
-its own row in System Settings → Notifications. When the helpers are missing
-(running the bare binary from `swift build` instead of the app bundle), the
-main app falls back to posting directly under its own identity.
+Setup shows the authorization state for each helper. A helper asks for
+notification permission only when its integration-specific test action is
+used, and then appears as its own row in System Settings → Notifications.
+Routine hook events never trigger a permission prompt. When the helpers are
+missing (running the bare binary from `swift build` instead of the app bundle),
+the main app falls back to posting directly under its own identity without
+requesting permission implicitly.
 
 ## Transient banners
 

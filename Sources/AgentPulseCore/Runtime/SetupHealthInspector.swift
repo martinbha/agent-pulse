@@ -9,6 +9,7 @@ struct SetupHealthInspector {
     typealias HostProvider = (AgentKind) async -> IntegrationHostHealth
     typealias HookProvider = (AgentKind) -> HookConfigurationHealth
     typealias NotificationProvider = () async -> NotificationAuthorizationHealth
+    typealias NotificationHelperProvider = (AgentKind) async -> NotificationAuthorizationHealth
     typealias LaunchAtLoginProvider = @MainActor () async -> LaunchAtLoginHealth
 
     private let now: () -> Date
@@ -18,6 +19,7 @@ struct SetupHealthInspector {
     private let hostProvider: HostProvider
     private let hookProvider: HookProvider
     private let notificationProvider: NotificationProvider
+    private let notificationHelperProvider: NotificationHelperProvider
     private let launchAtLoginProvider: LaunchAtLoginProvider
 
     init(
@@ -28,6 +30,9 @@ struct SetupHealthInspector {
         hostProvider: @escaping HostProvider,
         hookProvider: @escaping HookProvider,
         notificationProvider: @escaping NotificationProvider,
+        notificationHelperProvider: @escaping NotificationHelperProvider = {
+            _ in .unavailable("Notification helper status is unavailable.")
+        },
         launchAtLoginProvider: @escaping LaunchAtLoginProvider
     ) {
         self.now = now
@@ -37,6 +42,7 @@ struct SetupHealthInspector {
         self.hostProvider = hostProvider
         self.hookProvider = hookProvider
         self.notificationProvider = notificationProvider
+        self.notificationHelperProvider = notificationHelperProvider
         self.launchAtLoginProvider = launchAtLoginProvider
     }
 
@@ -50,9 +56,11 @@ struct SetupHealthInspector {
 
         var hosts: [AgentKind: IntegrationHostHealth] = [:]
         var hooks: [AgentKind: HookConfigurationHealth] = [:]
+        var notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:]
         for agent in AgentKind.allCases {
             hosts[agent] = await hostProvider(agent)
             hooks[agent] = hookProvider(agent)
+            notificationHelpers[agent] = await notificationHelperProvider(agent)
         }
 
         return await SetupHealthClassifier.makeSnapshot(
@@ -65,6 +73,7 @@ struct SetupHealthInspector {
             usage: usage,
             events: events,
             notifications: notifications,
+            notificationHelpers: notificationHelpers,
             launchAtLogin: launchAtLogin
         )
     }
@@ -76,6 +85,7 @@ struct SetupHealthInspector {
         bundleURL: URL = Bundle.main.bundleURL,
         fileManager: FileManager = .default,
         notificationCenter: UNUserNotificationCenter = .current(),
+        notificationPermissionService: NotificationPermissionService? = nil,
         launchAtLoginService: LaunchAtLoginService? = nil,
         now: @escaping () -> Date = Date.init
     ) -> SetupHealthInspector {
@@ -106,6 +116,12 @@ struct SetupHealthInspector {
             homeDirectory: homeDirectory,
             bundleURL: bundleURL
         )
+        let notificationPermissionService = notificationPermissionService
+            ?? NotificationPermissionService.live(
+                center: notificationCenter,
+                bundleURL: bundleURL,
+                fileManager: fileManager
+            )
 
         return SetupHealthInspector(
             now: now,
@@ -132,7 +148,10 @@ struct SetupHealthInspector {
                 }
             },
             notificationProvider: {
-                await notificationHealth(center: notificationCenter)
+                await notificationPermissionService.mainHealth()
+            },
+            notificationHelperProvider: { agent in
+                await notificationPermissionService.helperHealth(for: agent)
             },
             launchAtLoginProvider: {
                 launchAtLoginService.health
@@ -317,20 +336,6 @@ struct SetupHealthInspector {
             }
         }
         return nil
-    }
-
-    private static func notificationHealth(
-        center: UNUserNotificationCenter
-    ) async -> NotificationAuthorizationHealth {
-        let settings = await center.notificationSettings()
-        switch settings.authorizationStatus {
-        case .notDetermined: return .notDetermined
-        case .denied: return .denied
-        case .authorized: return .authorized
-        case .provisional: return .provisional
-        case .ephemeral: return .ephemeral
-        @unknown default: return .unavailable("Unknown notification authorization state.")
-        }
     }
 
     private static func jsonBlockerMessage(_ blocker: JSONHookConfigurationBlocker) -> String {

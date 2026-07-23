@@ -46,6 +46,8 @@ import Testing
         #expect(snapshot.signInAction == .signIn(.claude))
         #expect(snapshot.testAction == .testIntegration(.claude))
         #expect(snapshot.notificationAction == .requestNotificationPermission)
+        #expect(snapshot.helperNotificationAction == .requestNotificationPermission)
+        #expect(snapshot.deniedHelperNotificationAction == .openNotificationSettings)
         #expect(snapshot.loginAction == .approveLaunchAtLogin)
         #expect(snapshot.completeBlockingIssue == nil)
         #expect(snapshot.lastEventName == "Stop")
@@ -114,6 +116,8 @@ import Testing
         #expect(snapshot.secondHooks == .current)
         #expect(snapshot.firstUsage == .error)
         #expect(snapshot.notifications == .authorized)
+        #expect(snapshot.notificationHelpers[.claude] == .notDetermined)
+        #expect(snapshot.notificationHelpers[.codex] == .denied)
         #expect(snapshot.launchAtLogin == .enabled)
         guard case .received(let event, _, let age) = snapshot.lastEvent else {
             Issue.record("Expected a recent integration event")

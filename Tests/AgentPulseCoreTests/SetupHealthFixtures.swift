@@ -26,6 +26,8 @@ struct SetupTransitionSnapshot {
     var signInAction: SetupRecommendedAction
     var testAction: SetupRecommendedAction
     var notificationAction: SetupRecommendedAction
+    var helperNotificationAction: SetupRecommendedAction
+    var deniedHelperNotificationAction: SetupRecommendedAction
     var loginAction: SetupRecommendedAction
     var completeBlockingIssue: SetupBlockingIssue?
     var lastEventName: String?
@@ -60,6 +62,7 @@ struct SetupInspectionSnapshot {
     var secondHooks: HookConfigurationHealth?
     var firstUsage: SetupUsageHealth?
     var notifications: NotificationAuthorizationHealth
+    var notificationHelpers: [AgentKind: NotificationAuthorizationHealth]
     var launchAtLogin: LaunchAtLoginHealth
     var lastEvent: LastIntegrationEventHealth?
     var diagnosticsContainSecret: Bool
@@ -125,6 +128,7 @@ enum SetupHealthFixtures {
             usage: [AgentKind: UsageAvailability]? = nil,
             events overrideEvents: [AgentKind: AgentStatusSnapshot]? = nil,
             notifications: NotificationAuthorizationHealth = .authorized,
+            notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:],
             launchAtLogin: LaunchAtLoginHealth = .enabled
         ) -> SetupHealthSnapshot {
             SetupHealthClassifier.makeSnapshot(
@@ -137,6 +141,7 @@ enum SetupHealthFixtures {
                 usage: usage ?? availableUsage,
                 events: overrideEvents ?? events,
                 notifications: notifications,
+                notificationHelpers: notificationHelpers,
                 launchAtLogin: launchAtLogin
             )
         }
@@ -180,6 +185,18 @@ enum SetupHealthFixtures {
             signInAction: snapshot(usage: missingAuth).recommendedAction,
             testAction: snapshot(events: missingEvent).recommendedAction,
             notificationAction: snapshot(notifications: .notDetermined).recommendedAction,
+            helperNotificationAction: snapshot(
+                notificationHelpers: [
+                    .claude: .notDetermined,
+                    .codex: .authorized,
+                ]
+            ).recommendedAction,
+            deniedHelperNotificationAction: snapshot(
+                notificationHelpers: [
+                    .claude: .denied,
+                    .codex: .authorized,
+                ]
+            ).recommendedAction,
             loginAction: snapshot(launchAtLogin: .requiresApproval).recommendedAction,
             completeBlockingIssue: complete.blockingIssue,
             lastEventName: eventName(from: complete.integration(for: .claude)?.lastEvent),
@@ -335,6 +352,9 @@ enum SetupHealthFixtures {
             },
             hookProvider: { _ in .current },
             notificationProvider: { .authorized },
+            notificationHelperProvider: { agent in
+                agent == .claude ? .notDetermined : .denied
+            },
             launchAtLoginProvider: { .enabled }
         )
 
@@ -352,6 +372,7 @@ enum SetupHealthFixtures {
             secondHooks: snapshot.integration(for: .codex)?.hooks,
             firstUsage: snapshot.integration(for: .claude)?.usage,
             notifications: snapshot.notifications,
+            notificationHelpers: snapshot.notificationHelpers,
             launchAtLogin: snapshot.launchAtLogin,
             lastEvent: snapshot.integration(for: .claude)?.lastEvent,
             diagnosticsContainSecret: diagnostics.contains("private-token"),
