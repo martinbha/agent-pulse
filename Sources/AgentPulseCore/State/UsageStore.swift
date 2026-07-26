@@ -15,6 +15,8 @@ final class UsageStore: ObservableObject {
     private let userDefaults: UserDefaults
     private let activeAgentsProvider: @MainActor () -> [AgentKind]
     private var refreshTask: Task<Void, Never>?
+    private var refreshingAgents: Set<AgentKind> = []
+    private var pendingRefreshAgents: Set<AgentKind> = []
     private var preservedFailureCounts: [AgentKind: Int] = [:]
 
     private let refreshIntervalDefaultsKey = "usage.refreshInterval"
@@ -82,13 +84,20 @@ final class UsageStore: ObservableObject {
         trigger: RefreshTrigger = .automatic,
         agents requestedAgents: [AgentKind]? = nil
     ) async {
-        guard !isRefreshing else { return }
+        guard !isRefreshing else {
+            if let requestedAgents {
+                pendingRefreshAgents.formUnion(
+                    requestedAgents.filter { !refreshingAgents.contains($0) }
+                )
+            }
+            return
+        }
         isRefreshing = true
-        defer { isRefreshing = false }
 
         let activeAgents = activeAgentsProvider()
         let activeSet = Set(activeAgents)
         let agents = (requestedAgents ?? activeAgents).filter(activeSet.contains)
+        refreshingAgents = Set(agents)
         let shouldForceCredentialRefresh = trigger == .manual
         let previous = snapshots
 
@@ -142,6 +151,17 @@ final class UsageStore: ObservableObject {
         lastRefreshAttemptedAt = now
         if anyFresh {
             lastUpdated = now
+        }
+
+        refreshingAgents = []
+        isRefreshing = false
+
+        let pendingAgents = activeAgentsProvider().filter {
+            pendingRefreshAgents.contains($0)
+        }
+        pendingRefreshAgents = []
+        if !pendingAgents.isEmpty {
+            await refresh(agents: pendingAgents)
         }
     }
 

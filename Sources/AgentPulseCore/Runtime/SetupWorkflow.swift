@@ -200,6 +200,7 @@ final class SetupWorkflow: ObservableObject {
     private let defaults: UserDefaults
     private let inspectionProvider: InspectionProvider
     private let operationExecutor: OperationExecutor
+    private var refreshRequested = false
 
     private static let welcomeSeenKey = "setup.welcomeSeen"
 
@@ -277,12 +278,16 @@ final class SetupWorkflow: ObservableObject {
             notificationNotices = [:]
         }
         guard !isRefreshing else {
+            refreshRequested = true
             return
         }
 
         isRefreshing = true
-        let snapshot = await inspectionProvider()
-        self.snapshot = snapshot
+        repeat {
+            refreshRequested = false
+            let snapshot = await inspectionProvider()
+            self.snapshot = snapshot
+        } while refreshRequested
         isRefreshing = false
     }
 

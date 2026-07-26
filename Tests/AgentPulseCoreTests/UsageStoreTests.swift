@@ -155,4 +155,30 @@ import Testing
         #expect(codexProbe.fetchCount == 1)
         #expect(store.snapshot(for: .codex).fiveHour.usedPercentage == 12)
     }
+
+    @Test func reenabledAgentRefreshWaitsForInFlightPolling() async {
+        let defaults = UsageStoreFixtures.ephemeralDefaults()
+        let activeAgentSettings = ActiveAgentSettings(defaults: defaults)
+        activeAgentSettings.setSelection(.claude)
+        let (store, claudeProbe, codexProbe) = UsageStoreFixtures.makeStore(
+            claude: [UsageStoreFixtures.usage(.claude, fiveHour: 42, weekly: 67)],
+            codex: [UsageStoreFixtures.usage(.codex, fiveHour: 12, weekly: 30)],
+            defaults: defaults,
+            activeAgentsProvider: { activeAgentSettings.activeAgents },
+            claudeFetchDelayNanoseconds: 50_000_000
+        )
+
+        async let inFlightRefresh: Void = store.refresh()
+        while !store.isRefreshing {
+            await Task.yield()
+        }
+
+        activeAgentSettings.setSelection(.both)
+        await store.refresh(agents: [.codex])
+        await inFlightRefresh
+
+        #expect(claudeProbe.fetchCount == 1)
+        #expect(codexProbe.fetchCount == 1)
+        #expect(store.snapshot(for: .codex).fiveHour.usedPercentage == 12)
+    }
 }
