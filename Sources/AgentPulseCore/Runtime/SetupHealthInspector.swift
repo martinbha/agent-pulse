@@ -51,6 +51,7 @@ struct SetupHealthInspector {
     }
 
     func inspect(
+        agents: [AgentKind] = AgentKind.allCases,
         usage: [AgentKind: UsageAvailability],
         events: [AgentKind: AgentStatusSnapshot]
     ) async -> SetupHealthSnapshot {
@@ -62,7 +63,7 @@ struct SetupHealthInspector {
         var hooks: [AgentKind: HookConfigurationHealth] = [:]
         var hookTrust: [AgentKind: HookTrustHealth] = [:]
         var notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:]
-        for agent in AgentKind.allCases {
+        for agent in agents {
             hosts[agent] = await hostProvider(agent)
             hooks[agent] = hookProvider(agent)
             hookTrust[agent] = await hookTrustProvider(agent)
@@ -71,6 +72,7 @@ struct SetupHealthInspector {
 
         return await SetupHealthClassifier.makeSnapshot(
             inspectedAt: now(),
+            agents: agents,
             application: applicationProvider(),
             localServer: localServer,
             bridge: bridgeProvider(),

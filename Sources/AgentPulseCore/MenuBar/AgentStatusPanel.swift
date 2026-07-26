@@ -6,6 +6,7 @@ struct AgentStatusPanel: View {
     @ObservedObject var store: AgentStatusStore
     @ObservedObject var usageStore: UsageStore
     @ObservedObject var appearance: AppearanceSettings
+    @ObservedObject var activeAgentSettings: ActiveAgentSettings
     @ObservedObject var appLauncher: AgentAppLauncher
     var openSettings: () -> Void
     var dismiss: () -> Void
@@ -17,7 +18,7 @@ struct AgentStatusPanel: View {
             Divider()
 
             VStack(spacing: 12) {
-                ForEach(Array(store.orderedSnapshots.enumerated()), id: \.element.id) { index, snapshot in
+                ForEach(Array(activeSnapshots.enumerated()), id: \.element.id) { index, snapshot in
                     if index > 0 {
                         Divider()
                     }
@@ -58,6 +59,10 @@ struct AgentStatusPanel: View {
         .padding(16)
         .frame(width: 360)
         .agentPulseFont(size: 13)
+    }
+
+    private var activeSnapshots: [AgentStatusSnapshot] {
+        activeAgentSettings.activeAgents.compactMap { store.snapshots[$0] }
     }
 
     private func openAgentApp(_ agent: AgentKind) {

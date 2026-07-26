@@ -67,6 +67,11 @@ struct SetupNotificationNoticeLifecycleSnapshot {
     var noticeAfterExternalRefresh: SetupOperationNotice?
 }
 
+struct SetupConcurrentRefreshSnapshot {
+    var inspectionCount: Int
+    var finalAction: SetupRecommendedAction?
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -360,6 +365,37 @@ enum SetupWorkflowFixtures {
         return SetupLaunchAtLoginNoticeSnapshot(
             noticeAfterOperation: noticeAfterOperation,
             noticeAfterExternalRefresh: workflow.launchAtLoginNotice
+        )
+    }
+
+    @MainActor
+    static func concurrentRefreshesAreCoalesced() async -> SetupConcurrentRefreshSnapshot {
+        var inspectionCount = 0
+        let workflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                inspectionCount += 1
+                if inspectionCount == 1 {
+                    try? await Task.sleep(for: .milliseconds(50))
+                    return makeSnapshot(hooks: [.claude: .missing, .codex: .current])
+                }
+                return makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+
+        async let inFlightRefresh: Void = workflow.refresh()
+        while !workflow.isRefreshing {
+            await Task.yield()
+        }
+        await workflow.refresh()
+        await inFlightRefresh
+
+        return SetupConcurrentRefreshSnapshot(
+            inspectionCount: inspectionCount,
+            finalAction: workflow.snapshot?.recommendedAction
         )
     }
 

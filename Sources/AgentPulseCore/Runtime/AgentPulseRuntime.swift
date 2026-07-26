@@ -6,6 +6,7 @@ final class AgentPulseRuntime: ObservableObject {
     let store: AgentStatusStore
     let usageStore: UsageStore
     let settings: AgentPulseSettings
+    let activeAgentSettings: ActiveAgentSettings
     let appearance: AppearanceSettings
     let hotkeySettings: HotkeySettings
     let appLauncher = AgentAppLauncher()
@@ -31,10 +32,16 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     convenience init() {
+        let activeAgentSettings = ActiveAgentSettings()
         self.init(
             store: AgentStatusStore(),
-            usageStore: UsageStore(),
+            usageStore: UsageStore(
+                activeAgentsProvider: {
+                    activeAgentSettings.activeAgents
+                }
+            ),
             settings: AgentPulseSettings(),
+            activeAgentSettings: activeAgentSettings,
             appearance: AppearanceSettings(),
             hotkeySettings: HotkeySettings()
         )
@@ -44,12 +51,14 @@ final class AgentPulseRuntime: ObservableObject {
         store: AgentStatusStore,
         usageStore: UsageStore,
         settings: AgentPulseSettings,
+        activeAgentSettings: ActiveAgentSettings,
         appearance: AppearanceSettings,
         hotkeySettings: HotkeySettings
     ) {
         self.store = store
         self.usageStore = usageStore
         self.settings = settings
+        self.activeAgentSettings = activeAgentSettings
         self.appearance = appearance
         self.hotkeySettings = hotkeySettings
         self.notificationService = AgentNotificationService()
@@ -64,6 +73,23 @@ final class AgentPulseRuntime: ObservableObject {
 
     func refreshUsage() {
         Task { await usageStore.refresh(trigger: .manual) }
+    }
+
+    func setActiveAgentSelection(_ selection: ActiveAgentSelection) {
+        let previouslyActive = Set(activeAgentSettings.activeAgents)
+        guard activeAgentSettings.setSelection(selection) else {
+            return
+        }
+
+        let newlyActive = activeAgentSettings.activeAgents.filter {
+            !previouslyActive.contains($0)
+        }
+        Task {
+            if !newlyActive.isEmpty {
+                await usageStore.refresh(agents: newlyActive)
+            }
+            await setup.refresh()
+        }
     }
 
     deinit {
@@ -173,6 +199,10 @@ final class AgentPulseRuntime: ObservableObject {
         let previousState = store.effectiveState(for: previousSnapshot)
 
         store.ingest(event)
+
+        guard activeAgentSettings.isActive(event.agent) else {
+            return
+        }
 
         guard let newSnapshot = store.snapshots[event.agent] else {
             return

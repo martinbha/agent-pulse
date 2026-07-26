@@ -95,6 +95,13 @@ import Testing
         #expect(snapshot.noticeAfterExternalRefresh == nil)
     }
 
+    @Test @MainActor func concurrentRefreshRequestsRunASecondInspection() async {
+        let snapshot = await SetupWorkflowFixtures.concurrentRefreshesAreCoalesced()
+
+        #expect(snapshot.inspectionCount == 2)
+        #expect(snapshot.finalAction == SetupRecommendedAction.none)
+    }
+
     @Test @MainActor func translocationPreventsConfigurationMutation() async {
         let snapshot = await SetupWorkflowFixtures.translocatedMutation()
 

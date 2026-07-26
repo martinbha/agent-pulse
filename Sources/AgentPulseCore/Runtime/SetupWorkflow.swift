@@ -200,6 +200,7 @@ final class SetupWorkflow: ObservableObject {
     private let defaults: UserDefaults
     private let inspectionProvider: InspectionProvider
     private let operationExecutor: OperationExecutor
+    private var refreshRequested = false
 
     private static let welcomeSeenKey = "setup.welcomeSeen"
 
@@ -231,12 +232,14 @@ final class SetupWorkflow: ObservableObject {
         )
         return SetupWorkflow(
             inspectionProvider: { [unowned runtime] in
+                let activeAgents = runtime.activeAgentSettings.activeAgents
                 let usage = Dictionary(
-                    uniqueKeysWithValues: AgentKind.allCases.map { agent in
+                    uniqueKeysWithValues: activeAgents.map { agent in
                         (agent, runtime.usageStore.status(for: agent).availability)
                     }
                 )
                 return await inspector.inspect(
+                    agents: activeAgents,
                     usage: usage,
                     events: runtime.store.snapshots
                 )
@@ -275,12 +278,16 @@ final class SetupWorkflow: ObservableObject {
             notificationNotices = [:]
         }
         guard !isRefreshing else {
+            refreshRequested = true
             return
         }
 
         isRefreshing = true
-        let snapshot = await inspectionProvider()
-        self.snapshot = snapshot
+        repeat {
+            refreshRequested = false
+            let snapshot = await inspectionProvider()
+            self.snapshot = snapshot
+        } while refreshRequested
         isRefreshing = false
     }
 

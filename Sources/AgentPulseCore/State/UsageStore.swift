@@ -13,7 +13,10 @@ final class UsageStore: ObservableObject {
 
     private let probes: [AgentKind: any UsageProbing]
     private let userDefaults: UserDefaults
+    private let activeAgentsProvider: @MainActor () -> [AgentKind]
     private var refreshTask: Task<Void, Never>?
+    private var refreshingAgents: Set<AgentKind> = []
+    private var pendingRefreshAgents: Set<AgentKind> = []
     private var preservedFailureCounts: [AgentKind: Int] = [:]
 
     private let refreshIntervalDefaultsKey = "usage.refreshInterval"
@@ -24,10 +27,14 @@ final class UsageStore: ObservableObject {
             .codex: CodexUsageProbe(),
         ],
         userDefaults: UserDefaults = .standard,
+        activeAgentsProvider: @escaping @MainActor () -> [AgentKind] = {
+            AgentKind.allCases
+        },
         startRefreshLoop: Bool = true
     ) {
         self.probes = probes
         self.userDefaults = userDefaults
+        self.activeAgentsProvider = activeAgentsProvider
 
         var initial: [AgentKind: AgentUsageSnapshot] = [:]
         for agent in AgentKind.allCases {
@@ -73,11 +80,24 @@ final class UsageStore: ObservableObject {
     /// Triggers a one-off refresh. `.manual` re-resolves credentials from
     /// scratch (re-attempting previously denied Keychain access) and clears the
     /// cached-value preservation so stale numbers can't mask a fixed login.
-    func refresh(trigger: RefreshTrigger = .automatic) async {
-        guard !isRefreshing else { return }
+    func refresh(
+        trigger: RefreshTrigger = .automatic,
+        agents requestedAgents: [AgentKind]? = nil
+    ) async {
+        guard !isRefreshing else {
+            if let requestedAgents {
+                pendingRefreshAgents.formUnion(
+                    requestedAgents.filter { !refreshingAgents.contains($0) }
+                )
+            }
+            return
+        }
         isRefreshing = true
-        defer { isRefreshing = false }
 
+        let activeAgents = activeAgentsProvider()
+        let activeSet = Set(activeAgents)
+        let agents = (requestedAgents ?? activeAgents).filter(activeSet.contains)
+        refreshingAgents = Set(agents)
         let shouldForceCredentialRefresh = trigger == .manual
         let previous = snapshots
 
@@ -85,13 +105,13 @@ final class UsageStore: ObservableObject {
             // Keep showing the current numbers while the fetch runs — blanking
             // to a loading placeholder mid-refresh makes the dropdown collapse
             // and re-expand. The merge below still replaces them wholesale.
-            for agent in AgentKind.allCases {
+            for agent in agents {
                 preservedFailureCounts[agent] = 0
             }
         }
 
         let fetched = await withTaskGroup(of: (AgentKind, AgentUsageSnapshot).self) { group in
-            for agent in AgentKind.allCases {
+            for agent in agents {
                 guard let probe = probes[agent] else { continue }
                 group.addTask {
                     (agent, await probe.fetch(trigger: trigger))
@@ -106,7 +126,7 @@ final class UsageStore: ObservableObject {
         }
 
         var anyFresh = false
-        for agent in AgentKind.allCases {
+        for agent in agents {
             guard let current = fetched[agent] else { continue }
             let previousSnapshot = previous[agent] ?? .loading(agent)
 
@@ -131,6 +151,17 @@ final class UsageStore: ObservableObject {
         lastRefreshAttemptedAt = now
         if anyFresh {
             lastUpdated = now
+        }
+
+        refreshingAgents = []
+        isRefreshing = false
+
+        let pendingAgents = activeAgentsProvider().filter {
+            pendingRefreshAgents.contains($0)
+        }
+        pendingRefreshAgents = []
+        if !pendingAgents.isEmpty {
+            await refresh(agents: pendingAgents)
         }
     }
 

@@ -8,14 +8,22 @@ final class FakeUsageProbe: UsageProbing, @unchecked Sendable {
     private let lock = NSLock()
     private var scripted: [AgentUsageSnapshot]
     private var index = 0
+    private let fetchDelayNanoseconds: UInt64
     private(set) var manualTriggerCount = 0
     private(set) var fetchCount = 0
 
-    init(_ scripted: [AgentUsageSnapshot]) {
+    init(
+        _ scripted: [AgentUsageSnapshot],
+        fetchDelayNanoseconds: UInt64 = 0
+    ) {
         self.scripted = scripted
+        self.fetchDelayNanoseconds = fetchDelayNanoseconds
     }
 
     func fetch(trigger: RefreshTrigger) async -> AgentUsageSnapshot {
+        if fetchDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchDelayNanoseconds)
+        }
         lock.lock()
         defer { lock.unlock() }
         fetchCount += 1
@@ -75,13 +83,25 @@ enum UsageStoreFixtures {
     static func makeStore(
         claude: [AgentUsageSnapshot],
         codex: [AgentUsageSnapshot],
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        activeAgentsProvider: @escaping @MainActor () -> [AgentKind] = {
+            AgentKind.allCases
+        },
+        claudeFetchDelayNanoseconds: UInt64 = 0,
+        codexFetchDelayNanoseconds: UInt64 = 0
     ) -> (store: UsageStore, claudeProbe: FakeUsageProbe, codexProbe: FakeUsageProbe) {
-        let claudeProbe = FakeUsageProbe(claude)
-        let codexProbe = FakeUsageProbe(codex)
+        let claudeProbe = FakeUsageProbe(
+            claude,
+            fetchDelayNanoseconds: claudeFetchDelayNanoseconds
+        )
+        let codexProbe = FakeUsageProbe(
+            codex,
+            fetchDelayNanoseconds: codexFetchDelayNanoseconds
+        )
         let store = UsageStore(
             probes: [.claude: claudeProbe, .codex: codexProbe],
             userDefaults: defaults,
+            activeAgentsProvider: activeAgentsProvider,
             startRefreshLoop: false
         )
         return (store, claudeProbe, codexProbe)
