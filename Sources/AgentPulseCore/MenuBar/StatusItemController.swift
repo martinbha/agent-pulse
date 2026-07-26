@@ -104,6 +104,7 @@ final class StatusItemController: NSObject {
             store: runtime.store,
             usageStore: runtime.usageStore,
             appearance: runtime.appearance,
+            activeAgentSettings: runtime.activeAgentSettings,
             appLauncher: runtime.appLauncher,
             openSettings: { [weak self] in
                 self?.showSettingsWindow()
@@ -145,6 +146,30 @@ final class StatusItemController: NSObject {
                 }
                 .store(in: &cancellables)
         }
+
+        runtime.activeAgentSettings.objectWillChange
+            .sink { [weak self] _ in
+                self?.scheduleActiveAgentUpdate()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func scheduleActiveAgentUpdate() {
+        scheduleStatusItemUpdate()
+        DispatchQueue.main.async { [weak self] in
+            self?.resizeVisibleSurfaces()
+        }
+    }
+
+    private func resizeVisibleSurfaces() {
+        if let popoverPanel, popoverPanel.isVisible {
+            popoverPanel.setContentSize(dropdownContentSize(for: popoverHostingController))
+            positionPopoverPanel(popoverPanel)
+        }
+        if let pinnedPanel, pinnedPanel.isVisible {
+            pinnedPanel.setContentSize(dropdownContentSize(for: pinnedHostingController))
+            positionPinnedPanel(pinnedPanel)
+        }
     }
 
     private func scheduleStatusItemUpdate() {
@@ -167,7 +192,9 @@ final class StatusItemController: NSObject {
             return
         }
 
-        let snapshots = runtime.store.orderedSnapshots
+        let snapshots = runtime.activeAgentSettings.activeAgents.compactMap {
+            runtime.store.snapshots[$0]
+        }
         let pills = snapshots.map { snapshot in
             let usage = runtime.usageStore.snapshot(for: snapshot.agent)
             return MenuBarPillBuilder.pill(
@@ -437,7 +464,8 @@ final class StatusItemController: NSObject {
         let hostingController = NSHostingController(
             rootView: AgentPulseSettingsView(
                 runtime: runtime,
-                workflow: runtime.setup
+                workflow: runtime.setup,
+                activeAgentSettings: runtime.activeAgentSettings
             )
         )
         hostingController.sizingOptions = []

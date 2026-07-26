@@ -4,6 +4,7 @@ import SwiftUI
 struct AgentPulseSettingsView: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var workflow: SetupWorkflow
+    @ObservedObject var activeAgentSettings: ActiveAgentSettings
     @State private var pendingRemovalAgent: AgentKind?
     @State private var isConfirmingTokenRotation = false
 
@@ -34,7 +35,7 @@ struct AgentPulseSettingsView: View {
                             Text("Integrations")
                                 .agentPulseFont(size: 18)
 
-                            ForEach(snapshot.integrations) { integration in
+                            ForEach(activeIntegrations(in: snapshot)) { integration in
                                 integrationCard(
                                     integration,
                                     bridge: snapshot.bridge,
@@ -136,12 +137,44 @@ struct AgentPulseSettingsView: View {
             UsageRefreshSettings(usageStore: runtime.usageStore)
                 .setupCard()
 
-            BrandColorSettings(appearance: runtime.appearance)
+            activeAgentsCard
+
+            BrandColorSettings(
+                appearance: runtime.appearance,
+                agents: activeAgentSettings.activeAgents
+            )
                 .setupCard()
 
             overlayShortcutCard
             previewEventsCard
         }
+    }
+
+    private var activeAgentsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Active coding agents")
+                .agentPulseFont(size: 15)
+
+            Text("Choose which agents appear in Agent Pulse and have their usage refreshed.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker(
+                "Active coding agents",
+                selection: Binding(
+                    get: { activeAgentSettings.selection },
+                    set: { runtime.setActiveAgentSelection($0) }
+                )
+            ) {
+                ForEach(ActiveAgentSelection.allCases) { selection in
+                    Text(selection.displayName)
+                        .tag(selection)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+        }
+        .setupCard()
     }
 
     private var overlayShortcutCard: some View {
@@ -169,32 +202,24 @@ struct AgentPulseSettingsView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                Button {
-                    runtime.sendTestEvent(agent: .claude)
-                } label: {
-                    Label("Start Claude", systemImage: "play.circle")
-                }
-
-                Button {
-                    runtime.sendTestEvent(agent: .codex)
-                } label: {
-                    Label("Start Codex", systemImage: "play.circle")
+                ForEach(activeAgentSettings.activeAgents) { agent in
+                    Button {
+                        runtime.sendTestEvent(agent: agent)
+                    } label: {
+                        Label("Start \(agent.displayName)", systemImage: "play.circle")
+                    }
                 }
 
                 Spacer()
             }
 
             HStack(spacing: 8) {
-                Button {
-                    runtime.stopTestEvent(agent: .claude)
-                } label: {
-                    Label("Stop Claude", systemImage: "stop.circle")
-                }
-
-                Button {
-                    runtime.stopTestEvent(agent: .codex)
-                } label: {
-                    Label("Stop Codex", systemImage: "stop.circle")
+                ForEach(activeAgentSettings.activeAgents) { agent in
+                    Button {
+                        runtime.stopTestEvent(agent: agent)
+                    } label: {
+                        Label("Stop \(agent.displayName)", systemImage: "stop.circle")
+                    }
                 }
 
                 Spacer()
@@ -294,7 +319,7 @@ struct AgentPulseSettingsView: View {
                 action: nil
             )
 
-            ForEach(AgentKind.allCases) { agent in
+            ForEach(activeAgentSettings.activeAgents) { agent in
                 let health = snapshot.notificationHelpers[agent]
                     ?? .unavailable("Notification helper status is unavailable.")
                 notificationStatusRow(
@@ -327,6 +352,11 @@ struct AgentPulseSettingsView: View {
             }
         }
         .setupCard()
+    }
+
+    private func activeIntegrations(in snapshot: SetupHealthSnapshot) -> [IntegrationHealthSnapshot] {
+        let activeAgents = Set(activeAgentSettings.activeAgents)
+        return snapshot.integrations.filter { activeAgents.contains($0.agent) }
     }
 
     private func notificationStatusRow(
