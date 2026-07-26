@@ -196,6 +196,7 @@ enum SetupHealthClassifier {
 
     static func makeSnapshot(
         inspectedAt: Date,
+        agents: [AgentKind] = AgentKind.allCases,
         application: ApplicationLocationHealth,
         localServer: LocalServerHealth,
         bridge: BridgeHealth,
@@ -208,7 +209,7 @@ enum SetupHealthClassifier {
         notificationHelpers: [AgentKind: NotificationAuthorizationHealth] = [:],
         launchAtLogin: LaunchAtLoginHealth
     ) -> SetupHealthSnapshot {
-        let integrations = AgentKind.allCases.map { agent in
+        let integrations = agents.map { agent in
             let host = hosts[agent] ?? .unavailable
             let hook = hooks[agent] ?? .missing
             let availability = setupUsageHealth(from: usage[agent] ?? .loading)

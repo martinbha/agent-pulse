@@ -231,12 +231,14 @@ final class SetupWorkflow: ObservableObject {
         )
         return SetupWorkflow(
             inspectionProvider: { [unowned runtime] in
+                let activeAgents = runtime.activeAgentSettings.activeAgents
                 let usage = Dictionary(
-                    uniqueKeysWithValues: AgentKind.allCases.map { agent in
+                    uniqueKeysWithValues: activeAgents.map { agent in
                         (agent, runtime.usageStore.status(for: agent).availability)
                     }
                 )
                 return await inspector.inspect(
+                    agents: activeAgents,
                     usage: usage,
                     events: runtime.store.snapshots
                 )

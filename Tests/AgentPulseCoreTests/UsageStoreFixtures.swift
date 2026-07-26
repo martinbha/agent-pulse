@@ -75,13 +75,17 @@ enum UsageStoreFixtures {
     static func makeStore(
         claude: [AgentUsageSnapshot],
         codex: [AgentUsageSnapshot],
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        activeAgentsProvider: @escaping @MainActor () -> [AgentKind] = {
+            AgentKind.allCases
+        }
     ) -> (store: UsageStore, claudeProbe: FakeUsageProbe, codexProbe: FakeUsageProbe) {
         let claudeProbe = FakeUsageProbe(claude)
         let codexProbe = FakeUsageProbe(codex)
         let store = UsageStore(
             probes: [.claude: claudeProbe, .codex: codexProbe],
             userDefaults: defaults,
+            activeAgentsProvider: activeAgentsProvider,
             startRefreshLoop: false
         )
         return (store, claudeProbe, codexProbe)
