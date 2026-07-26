@@ -7,6 +7,7 @@ struct AgentPulseSettingsView: View {
     @ObservedObject var activeAgentSettings: ActiveAgentSettings
     @State private var pendingRemovalAgent: AgentKind?
     @State private var isConfirmingTokenRotation = false
+    @State private var showsCompletionNotice = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +59,10 @@ struct AgentPulseSettingsView: View {
             if workflow.snapshot == nil {
                 await workflow.refresh()
             }
+            updateCompletionNotice()
+        }
+        .onChange(of: workflow.snapshot) {
+            updateCompletionNotice()
         }
         .confirmationDialog(
             "Remove this integration?",
@@ -94,8 +99,11 @@ struct AgentPulseSettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Agent Pulse Settings")
-                    .agentPulseFont(size: 22)
+                HStack(spacing: 9) {
+                    Text("Agent Pulse Settings")
+                        .agentPulseFont(size: 22)
+                    setupStatusPill
+                }
                 Text("Manage integrations, notifications, and app preferences.")
                     .foregroundStyle(.secondary)
                 Text(runtime.serverStatus)
@@ -118,6 +126,19 @@ struct AgentPulseSettingsView: View {
             .disabled(workflow.isRefreshing || workflow.activeOperation != nil)
         }
         .padding(20)
+    }
+
+    private var setupStatusPill: some View {
+        let isComplete = workflow.isSetupComplete
+        return Text(isComplete ? "Setup Complete" : "Setup Required")
+            .agentPulseFont(size: 11)
+            .foregroundStyle(isComplete ? Color.green : Color.orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                (isComplete ? Color.green : Color.orange).opacity(0.12),
+                in: Capsule()
+            )
     }
 
     private var loadingState: some View {
@@ -174,6 +195,7 @@ struct AgentPulseSettingsView: View {
             .labelsHidden()
             .pickerStyle(.segmented)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .setupCard()
     }
 
@@ -245,7 +267,7 @@ struct AgentPulseSettingsView: View {
             ) {
                 recommendedAction(for: snapshot)
             }
-        } else if snapshot.recommendedAction == .none {
+        } else if snapshot.recommendedAction == .none && showsCompletionNotice {
             messageCard(
                 title: "Setup is complete",
                 message: "The local bridge and configured integrations are healthy.",
@@ -264,6 +286,19 @@ struct AgentPulseSettingsView: View {
                 recommendedAction(for: snapshot)
             }
         }
+    }
+
+    private func updateCompletionNotice() {
+        guard workflow.isSetupComplete else {
+            showsCompletionNotice = false
+            return
+        }
+        guard !workflow.hasPresentedCompletionNotice else {
+            return
+        }
+
+        showsCompletionNotice = true
+        workflow.markCompletionNoticePresented()
     }
 
     private func bridgeCard(_ snapshot: SetupHealthSnapshot) -> some View {

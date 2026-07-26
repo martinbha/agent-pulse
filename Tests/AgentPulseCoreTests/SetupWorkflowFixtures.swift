@@ -72,6 +72,15 @@ struct SetupConcurrentRefreshSnapshot {
     var finalAction: SetupRecommendedAction?
 }
 
+struct SetupCompletionPresentationSnapshot {
+    var completeBeforeRefresh: Bool
+    var completeAfterRefresh: Bool
+    var incompleteSetupIsRequired: Bool
+    var initiallyPresented: Bool
+    var presentedAfterMarking: Bool
+    var presentedAfterReload: Bool
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -396,6 +405,56 @@ enum SetupWorkflowFixtures {
         return SetupConcurrentRefreshSnapshot(
             inspectionCount: inspectionCount,
             finalAction: workflow.snapshot?.recommendedAction
+        )
+    }
+
+    @MainActor
+    static func completionPresentationState() async -> SetupCompletionPresentationSnapshot {
+        let defaults = makeDefaults()
+        let workflow = SetupWorkflow(
+            defaults: defaults,
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+
+        let completeBeforeRefresh = workflow.isSetupComplete
+        let initiallyPresented = workflow.hasPresentedCompletionNotice
+        await workflow.refresh()
+        let completeAfterRefresh = workflow.isSetupComplete
+        workflow.markCompletionNoticePresented()
+
+        let incompleteWorkflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                makeSnapshot(hooks: [.claude: .missing, .codex: .current])
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+        await incompleteWorkflow.refresh()
+
+        let reloaded = SetupWorkflow(
+            defaults: defaults,
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+
+        return SetupCompletionPresentationSnapshot(
+            completeBeforeRefresh: completeBeforeRefresh,
+            completeAfterRefresh: completeAfterRefresh,
+            incompleteSetupIsRequired: !incompleteWorkflow.isSetupComplete,
+            initiallyPresented: initiallyPresented,
+            presentedAfterMarking: workflow.hasPresentedCompletionNotice,
+            presentedAfterReload: reloaded.hasPresentedCompletionNotice
         )
     }
 

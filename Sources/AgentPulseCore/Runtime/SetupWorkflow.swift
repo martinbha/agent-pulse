@@ -203,6 +203,7 @@ final class SetupWorkflow: ObservableObject {
     private var refreshRequested = false
 
     private static let welcomeSeenKey = "setup.welcomeSeen"
+    private static let completionNoticePresentedKey = "setup.completionNoticePresented"
 
     init(
         defaults: UserDefaults = .standard,
@@ -252,6 +253,17 @@ final class SetupWorkflow: ObservableObject {
         defaults.bool(forKey: Self.welcomeSeenKey)
     }
 
+    var hasPresentedCompletionNotice: Bool {
+        defaults.bool(forKey: Self.completionNoticePresentedKey)
+    }
+
+    var isSetupComplete: Bool {
+        guard let snapshot else {
+            return false
+        }
+        return snapshot.blockingIssue == nil && snapshot.recommendedAction == .none
+    }
+
     func prepareForLaunch() async -> Bool {
         await refresh()
         guard let snapshot else {
@@ -265,6 +277,10 @@ final class SetupWorkflow: ObservableObject {
 
     func markWelcomeSeen() {
         defaults.set(true, forKey: Self.welcomeSeenKey)
+    }
+
+    func markCompletionNoticePresented() {
+        defaults.set(true, forKey: Self.completionNoticePresentedKey)
     }
 
     func refresh(
