@@ -224,6 +224,7 @@ final class SetupWorkflow: ObservableObject {
     @Published private(set) var launchAtLoginNotice: SetupOperationNotice?
     @Published private(set) var notificationNotices: [AgentKind: SetupOperationNotice] = [:]
     @Published private(set) var testNotices: [AgentKind: SetupOperationNotice] = [:]
+    @Published private(set) var showsCompletionNotice = false
 
     private let defaults: UserDefaults
     private let inspectionProvider: InspectionProvider
@@ -315,6 +316,23 @@ final class SetupWorkflow: ObservableObject {
 
     func markCompletionNoticePresented() {
         defaults.set(true, forKey: Self.completionNoticePresentedKey)
+    }
+
+    func presentCompletionNoticeIfNeeded() {
+        guard isSetupComplete else {
+            showsCompletionNotice = false
+            return
+        }
+        guard !hasPresentedCompletionNotice else {
+            return
+        }
+
+        showsCompletionNotice = true
+        markCompletionNoticePresented()
+    }
+
+    func dismissCompletionNotice() {
+        showsCompletionNotice = false
     }
 
     func refresh(

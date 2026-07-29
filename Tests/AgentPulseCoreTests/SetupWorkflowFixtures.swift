@@ -78,6 +78,9 @@ struct SetupCompletionPresentationSnapshot {
     var incompleteStatus: SetupCompletionStatus
     var visibleSummary: SetupSummaryPresentation
     var consumedSummary: SetupSummaryPresentation
+    var visibleAfterPresentation: Bool
+    var visibleAfterDismissal: Bool
+    var visibleAfterReload: Bool
     var initiallyPresented: Bool
     var presentedAfterMarking: Bool
     var presentedAfterReload: Bool
@@ -435,7 +438,10 @@ enum SetupWorkflowFixtures {
             for: workflow.snapshot!,
             showsCompletionNotice: false
         )
-        workflow.markCompletionNoticePresented()
+        workflow.presentCompletionNoticeIfNeeded()
+        let visibleAfterPresentation = workflow.showsCompletionNotice
+        workflow.dismissCompletionNotice()
+        let visibleAfterDismissal = workflow.showsCompletionNotice
 
         let incompleteWorkflow = SetupWorkflow(
             defaults: makeDefaults(),
@@ -457,6 +463,8 @@ enum SetupWorkflowFixtures {
                 SetupOperationReport(message: "Finished")
             }
         )
+        await reloaded.refresh()
+        reloaded.presentCompletionNoticeIfNeeded()
 
         return SetupCompletionPresentationSnapshot(
             statusBeforeRefresh: statusBeforeRefresh,
@@ -464,6 +472,9 @@ enum SetupWorkflowFixtures {
             incompleteStatus: incompleteWorkflow.completionStatus,
             visibleSummary: visibleSummary,
             consumedSummary: consumedSummary,
+            visibleAfterPresentation: visibleAfterPresentation,
+            visibleAfterDismissal: visibleAfterDismissal,
+            visibleAfterReload: reloaded.showsCompletionNotice,
             initiallyPresented: initiallyPresented,
             presentedAfterMarking: workflow.hasPresentedCompletionNotice,
             presentedAfterReload: reloaded.hasPresentedCompletionNotice

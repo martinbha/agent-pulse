@@ -7,7 +7,6 @@ struct AgentPulseSettingsView: View {
     @ObservedObject var activeAgentSettings: ActiveAgentSettings
     @State private var pendingRemovalAgent: AgentKind?
     @State private var isConfirmingTokenRotation = false
-    @State private var showsCompletionNotice = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,10 +58,10 @@ struct AgentPulseSettingsView: View {
             if workflow.snapshot == nil {
                 await workflow.refresh()
             }
-            updateCompletionNotice()
+            workflow.presentCompletionNoticeIfNeeded()
         }
         .onChange(of: workflow.snapshot) {
-            updateCompletionNotice()
+            workflow.presentCompletionNoticeIfNeeded()
         }
         .confirmationDialog(
             "Remove this integration?",
@@ -273,7 +272,7 @@ struct AgentPulseSettingsView: View {
     private func setupSummary(_ snapshot: SetupHealthSnapshot) -> some View {
         switch SetupSummaryPresentationPolicy.presentation(
             for: snapshot,
-            showsCompletionNotice: showsCompletionNotice
+            showsCompletionNotice: workflow.showsCompletionNotice
         ) {
         case .actionRequired(let issue):
             messageCard(
@@ -305,19 +304,6 @@ struct AgentPulseSettingsView: View {
         case .hidden:
             EmptyView()
         }
-    }
-
-    private func updateCompletionNotice() {
-        guard workflow.isSetupComplete else {
-            showsCompletionNotice = false
-            return
-        }
-        guard !workflow.hasPresentedCompletionNotice else {
-            return
-        }
-
-        showsCompletionNotice = true
-        workflow.markCompletionNoticePresented()
     }
 
     private func bridgeCard(_ snapshot: SetupHealthSnapshot) -> some View {
