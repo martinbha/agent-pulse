@@ -7,8 +7,10 @@ import Testing
         let command = NotifierCommand(
             title: "Claude has begun Inferring",
             body: "agent-pulse · PreToolUse",
-            hostBundleID: "com.googlecode.iterm2"
+            hostBundleID: "com.googlecode.iterm2",
+            playsSound: true
         )
+        #expect(command.argumentList().contains(NotifierCommand.soundArgument))
         #expect(NotifierCommand.parse(command.argumentList()) == command)
     }
 
@@ -48,6 +50,7 @@ import Testing
     @Test func parseDefaultsMissingBodyToEmpty() {
         let command = NotifierCommand.parse(["--title", "Title"])
         #expect(command?.body == "")
+        #expect(command?.playsSound == false)
     }
 
     @Test func parseSkipsUnknownTokens() {
@@ -68,6 +71,29 @@ import Testing
                 requestsAuthorization: true
             ) == .request
         )
+    }
+
+    @Test func contentAndForegroundPresentationHonorSoundFlag() {
+        let silent = NotifierCommand(title: "Title", body: "Body")
+            .makeNotificationContent()
+        let audible = NotifierCommand(title: "Title", body: "Body", playsSound: true)
+            .makeNotificationContent()
+
+        #expect(silent.sound == nil)
+        #expect(audible.sound != nil)
+        #expect(NotifierPresentationPolicy.options(for: silent).contains(.banner))
+        #expect(!NotifierPresentationPolicy.options(for: silent).contains(.sound))
+        #expect(NotifierPresentationPolicy.options(for: audible).contains(.sound))
+    }
+
+    @Test func authorizationRequestsSoundOnlyWhenEnabled() {
+        let silent = NotifierAuthorizationOptionsPolicy.options(playsSound: false)
+        let audible = NotifierAuthorizationOptionsPolicy.options(playsSound: true)
+
+        #expect(silent.contains(.alert))
+        #expect(!silent.contains(.sound))
+        #expect(audible.contains(.alert))
+        #expect(audible.contains(.sound))
     }
 
     @Test func authorizedStatesPostWhileDeniedAndUnknownStatesDoNot() {

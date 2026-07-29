@@ -6,24 +6,29 @@ import UserNotifications
 public struct NotifierCommand: Equatable, Sendable {
     public static let hostBundleIDUserInfoKey = "hostBundleID"
     public static let requestAuthorizationArgument = "--request-authorization"
+    public static let requestSoundAuthorizationArgument = "--request-sound-authorization"
     public static let authorizationStatusArgument = "--authorization-status"
+    public static let soundArgument = "--sound"
 
     public var title: String
     public var body: String
     public var hostBundleID: String?
     public var requestsAuthorization: Bool
+    public var playsSound: Bool
 
     public init(
         title: String,
         body: String,
         hostBundleID: String? = nil,
-        requestsAuthorization: Bool = false
+        requestsAuthorization: Bool = false,
+        playsSound: Bool = false
     ) {
         self.title = title
         self.body = body
         // Normalized here so every consumer can treat presence as usable.
         self.hostBundleID = hostBundleID.flatMap { $0.isEmpty ? nil : $0 }
         self.requestsAuthorization = requestsAuthorization
+        self.playsSound = playsSound
     }
 
     public func argumentList() -> [String] {
@@ -34,6 +39,9 @@ public struct NotifierCommand: Equatable, Sendable {
         if requestsAuthorization {
             arguments.append(Self.requestAuthorizationArgument)
         }
+        if playsSound {
+            arguments.append(Self.soundArgument)
+        }
         return arguments
     }
 
@@ -43,7 +51,9 @@ public struct NotifierCommand: Equatable, Sendable {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        if playsSound {
+            content.sound = .default
+        }
         if let hostBundleID {
             content.userInfo = [Self.hostBundleIDUserInfoKey: hostBundleID]
         }
@@ -81,8 +91,31 @@ public struct NotifierCommand: Equatable, Sendable {
             title: title,
             body: values["--body"] ?? "",
             hostBundleID: values["--host-bundle-id"],
-            requestsAuthorization: arguments.contains(Self.requestAuthorizationArgument)
+            requestsAuthorization: arguments.contains(Self.requestAuthorizationArgument),
+            playsSound: arguments.contains(Self.soundArgument)
         )
+    }
+}
+
+public enum NotifierPresentationPolicy {
+    public static func options(
+        for content: UNNotificationContent
+    ) -> UNNotificationPresentationOptions {
+        var options: UNNotificationPresentationOptions = [.banner]
+        if content.sound != nil {
+            options.insert(.sound)
+        }
+        return options
+    }
+}
+
+public enum NotifierAuthorizationOptionsPolicy {
+    public static func options(playsSound: Bool) -> UNAuthorizationOptions {
+        var options: UNAuthorizationOptions = [.alert]
+        if playsSound {
+            options.insert(.sound)
+        }
+        return options
     }
 }
 

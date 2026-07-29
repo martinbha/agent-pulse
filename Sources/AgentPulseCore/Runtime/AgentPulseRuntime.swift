@@ -65,7 +65,9 @@ final class AgentPulseRuntime: ObservableObject {
         self.appearance = appearance
         self.hotkeySettings = hotkeySettings
         self.notificationPreferences = notificationPreferences
-        self.notificationService = AgentNotificationService()
+        self.notificationService = AgentNotificationService(
+            notificationPreferences: notificationPreferences
+        )
 
         startServer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
@@ -80,7 +82,10 @@ final class AgentPulseRuntime: ObservableObject {
     }
 
     func setNotificationSoundsEnabled(_ enabled: Bool) {
-        notificationPreferences.setPlaysSounds(enabled)
+        guard notificationPreferences.setPlaysSounds(enabled), enabled else {
+            return
+        }
+        notificationService.requestSoundAuthorization()
     }
 
     func setActiveAgentSelection(_ selection: ActiveAgentSelection) {
