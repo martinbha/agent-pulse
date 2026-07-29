@@ -466,7 +466,8 @@ final class StatusItemController: NSObject {
             rootView: AgentPulseSettingsView(
                 runtime: runtime,
                 workflow: runtime.setup,
-                activeAgentSettings: runtime.activeAgentSettings
+                activeAgentSettings: runtime.activeAgentSettings,
+                notificationPreferences: runtime.notificationPreferences
             )
         )
         hostingController.sizingOptions = []
