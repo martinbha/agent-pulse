@@ -102,6 +102,22 @@ import Testing
         #expect(snapshot.finalAction == SetupRecommendedAction.none)
     }
 
+    @Test @MainActor func setupCompletionPresentationPersistsAfterFirstDisplay() async {
+        let snapshot = await SetupWorkflowFixtures.completionPresentationState()
+
+        #expect(snapshot.statusBeforeRefresh == .checking)
+        #expect(snapshot.statusAfterRefresh == .complete)
+        #expect(snapshot.incompleteStatus == .required)
+        #expect(snapshot.visibleSummary == .completion)
+        #expect(snapshot.consumedSummary == .hidden)
+        #expect(snapshot.visibleAfterPresentation)
+        #expect(!snapshot.visibleAfterDismissal)
+        #expect(!snapshot.visibleAfterReload)
+        #expect(!snapshot.initiallyPresented)
+        #expect(snapshot.presentedAfterMarking)
+        #expect(snapshot.presentedAfterReload)
+    }
+
     @Test @MainActor func translocationPreventsConfigurationMutation() async {
         let snapshot = await SetupWorkflowFixtures.translocatedMutation()
 

@@ -111,6 +111,34 @@ enum SetupPresentationPolicy {
     }
 }
 
+enum SetupCompletionStatus: Equatable {
+    case checking
+    case required
+    case complete
+}
+
+enum SetupSummaryPresentation: Equatable {
+    case actionRequired(SetupBlockingIssue)
+    case partial(SetupRecommendedAction)
+    case completion
+    case hidden
+}
+
+enum SetupSummaryPresentationPolicy {
+    static func presentation(
+        for snapshot: SetupHealthSnapshot,
+        showsCompletionNotice: Bool
+    ) -> SetupSummaryPresentation {
+        if let issue = snapshot.blockingIssue {
+            return .actionRequired(issue)
+        }
+        if snapshot.recommendedAction == .none {
+            return showsCompletionNotice ? .completion : .hidden
+        }
+        return .partial(snapshot.recommendedAction)
+    }
+}
+
 enum SetupIntegrationOperations {
     static func canTest(_ integration: IntegrationHealthSnapshot) -> Bool {
         if case .current = integration.hooks {
@@ -196,6 +224,7 @@ final class SetupWorkflow: ObservableObject {
     @Published private(set) var launchAtLoginNotice: SetupOperationNotice?
     @Published private(set) var notificationNotices: [AgentKind: SetupOperationNotice] = [:]
     @Published private(set) var testNotices: [AgentKind: SetupOperationNotice] = [:]
+    @Published private(set) var showsCompletionNotice = false
 
     private let defaults: UserDefaults
     private let inspectionProvider: InspectionProvider
@@ -203,6 +232,7 @@ final class SetupWorkflow: ObservableObject {
     private var refreshRequested = false
 
     private static let welcomeSeenKey = "setup.welcomeSeen"
+    private static let completionNoticePresentedKey = "setup.completionNoticePresented"
 
     init(
         defaults: UserDefaults = .standard,
@@ -252,6 +282,23 @@ final class SetupWorkflow: ObservableObject {
         defaults.bool(forKey: Self.welcomeSeenKey)
     }
 
+    var hasPresentedCompletionNotice: Bool {
+        defaults.bool(forKey: Self.completionNoticePresentedKey)
+    }
+
+    var completionStatus: SetupCompletionStatus {
+        guard let snapshot else {
+            return .checking
+        }
+        return snapshot.blockingIssue == nil && snapshot.recommendedAction == .none
+            ? .complete
+            : .required
+    }
+
+    var isSetupComplete: Bool {
+        completionStatus == .complete
+    }
+
     func prepareForLaunch() async -> Bool {
         await refresh()
         guard let snapshot else {
@@ -265,6 +312,27 @@ final class SetupWorkflow: ObservableObject {
 
     func markWelcomeSeen() {
         defaults.set(true, forKey: Self.welcomeSeenKey)
+    }
+
+    func markCompletionNoticePresented() {
+        defaults.set(true, forKey: Self.completionNoticePresentedKey)
+    }
+
+    func presentCompletionNoticeIfNeeded() {
+        guard isSetupComplete else {
+            showsCompletionNotice = false
+            return
+        }
+        guard !hasPresentedCompletionNotice else {
+            return
+        }
+
+        showsCompletionNotice = true
+        markCompletionNoticePresented()
+    }
+
+    func dismissCompletionNotice() {
+        showsCompletionNotice = false
     }
 
     func refresh(

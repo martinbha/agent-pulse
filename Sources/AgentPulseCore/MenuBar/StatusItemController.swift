@@ -456,6 +456,7 @@ final class StatusItemController: NSObject {
         }
 
         if let window = settingsWindowController?.window {
+            runtime.setup.dismissCompletionNotice()
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
             return

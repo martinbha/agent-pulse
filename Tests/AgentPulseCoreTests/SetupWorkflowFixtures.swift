@@ -72,6 +72,20 @@ struct SetupConcurrentRefreshSnapshot {
     var finalAction: SetupRecommendedAction?
 }
 
+struct SetupCompletionPresentationSnapshot {
+    var statusBeforeRefresh: SetupCompletionStatus
+    var statusAfterRefresh: SetupCompletionStatus
+    var incompleteStatus: SetupCompletionStatus
+    var visibleSummary: SetupSummaryPresentation
+    var consumedSummary: SetupSummaryPresentation
+    var visibleAfterPresentation: Bool
+    var visibleAfterDismissal: Bool
+    var visibleAfterReload: Bool
+    var initiallyPresented: Bool
+    var presentedAfterMarking: Bool
+    var presentedAfterReload: Bool
+}
+
 enum SetupWorkflowFixtures {
     @MainActor
     static func presentationStates() -> SetupPresentationPolicySnapshot {
@@ -396,6 +410,74 @@ enum SetupWorkflowFixtures {
         return SetupConcurrentRefreshSnapshot(
             inspectionCount: inspectionCount,
             finalAction: workflow.snapshot?.recommendedAction
+        )
+    }
+
+    @MainActor
+    static func completionPresentationState() async -> SetupCompletionPresentationSnapshot {
+        let defaults = makeDefaults()
+        let workflow = SetupWorkflow(
+            defaults: defaults,
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+
+        let statusBeforeRefresh = workflow.completionStatus
+        let initiallyPresented = workflow.hasPresentedCompletionNotice
+        await workflow.refresh()
+        let statusAfterRefresh = workflow.completionStatus
+        let visibleSummary = SetupSummaryPresentationPolicy.presentation(
+            for: workflow.snapshot!,
+            showsCompletionNotice: true
+        )
+        let consumedSummary = SetupSummaryPresentationPolicy.presentation(
+            for: workflow.snapshot!,
+            showsCompletionNotice: false
+        )
+        workflow.presentCompletionNoticeIfNeeded()
+        let visibleAfterPresentation = workflow.showsCompletionNotice
+        workflow.dismissCompletionNotice()
+        let visibleAfterDismissal = workflow.showsCompletionNotice
+
+        let incompleteWorkflow = SetupWorkflow(
+            defaults: makeDefaults(),
+            inspectionProvider: {
+                makeSnapshot(hooks: [.claude: .missing, .codex: .current])
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+        await incompleteWorkflow.refresh()
+
+        let reloaded = SetupWorkflow(
+            defaults: defaults,
+            inspectionProvider: {
+                makeSnapshot()
+            },
+            operationExecutor: { _ in
+                SetupOperationReport(message: "Finished")
+            }
+        )
+        await reloaded.refresh()
+        reloaded.presentCompletionNoticeIfNeeded()
+
+        return SetupCompletionPresentationSnapshot(
+            statusBeforeRefresh: statusBeforeRefresh,
+            statusAfterRefresh: statusAfterRefresh,
+            incompleteStatus: incompleteWorkflow.completionStatus,
+            visibleSummary: visibleSummary,
+            consumedSummary: consumedSummary,
+            visibleAfterPresentation: visibleAfterPresentation,
+            visibleAfterDismissal: visibleAfterDismissal,
+            visibleAfterReload: reloaded.showsCompletionNotice,
+            initiallyPresented: initiallyPresented,
+            presentedAfterMarking: workflow.hasPresentedCompletionNotice,
+            presentedAfterReload: reloaded.hasPresentedCompletionNotice
         )
     }
 
