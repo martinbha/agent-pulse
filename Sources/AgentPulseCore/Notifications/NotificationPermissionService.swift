@@ -39,7 +39,8 @@ struct NotificationPermissionService {
     static func live(
         center: UNUserNotificationCenter = .current(),
         bundleURL: URL = Bundle.main.bundleURL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        notificationPreferences: NotificationPreferences? = nil
     ) -> NotificationPermissionService {
         NotificationPermissionService(
             mainStatusProvider: {
@@ -59,6 +60,7 @@ struct NotificationPermissionService {
                 return await helperHealth(executableURL: executableURL)
             },
             testSender: { agent in
+                let playsSound = notificationPreferences?.playsSounds ?? false
                 if let executableURL = NotificationHelperLocator.executableURL(
                     for: agent,
                     bundleURL: bundleURL,
@@ -66,12 +68,14 @@ struct NotificationPermissionService {
                 ) {
                     try await sendHelperTest(
                         agent: agent,
-                        executableURL: executableURL
+                        executableURL: executableURL,
+                        playsSound: playsSound
                     )
                 } else if bundleURL.pathExtension.lowercased() != "app" {
                     try await sendMainAppTest(
                         agent: agent,
-                        center: center
+                        center: center,
+                        playsSound: playsSound
                     )
                 } else {
                     throw NotificationPermissionFailure(
@@ -141,12 +145,14 @@ struct NotificationPermissionService {
 
     private static func sendHelperTest(
         agent: AgentKind,
-        executableURL: URL
+        executableURL: URL,
+        playsSound: Bool
     ) async throws {
         let command = NotifierCommand(
             title: "\(agent.notificationName) notification test",
             body: "This test authorizes and verifies the \(agent.displayName) notification sender.",
-            requestsAuthorization: true
+            requestsAuthorization: true,
+            playsSound: playsSound
         )
         let result = try await runHelper(
             executableURL: executableURL,
@@ -178,7 +184,8 @@ struct NotificationPermissionService {
 
     private static func sendMainAppTest(
         agent: AgentKind,
-        center: UNUserNotificationCenter
+        center: UNUserNotificationCenter,
+        playsSound: Bool
     ) async throws {
         let settings = await center.notificationSettings()
         let status = NotifierAuthorizationStatus(settings.authorizationStatus)
@@ -196,7 +203,11 @@ struct NotificationPermissionService {
         if action == .request {
             let granted: Bool
             do {
-                granted = try await center.requestAuthorization(options: [.alert, .sound])
+                granted = try await center.requestAuthorization(
+                    options: NotifierAuthorizationOptionsPolicy.options(
+                        playsSound: playsSound
+                    )
+                )
             } catch {
                 throw NotificationPermissionFailure(
                     message: "Agent Pulse could not request notification permission.",
@@ -213,7 +224,8 @@ struct NotificationPermissionService {
 
         let command = NotifierCommand(
             title: "\(agent.notificationName) notification test",
-            body: "Development fallback notification sent by Agent Pulse."
+            body: "Development fallback notification sent by Agent Pulse.",
+            playsSound: playsSound
         )
         let identifier = "agent-pulse-test-\(agent.rawValue)-\(UUID().uuidString)"
         let request = UNNotificationRequest(

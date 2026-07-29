@@ -5,6 +5,7 @@ struct AgentPulseSettingsView: View {
     @ObservedObject var runtime: AgentPulseRuntime
     @ObservedObject var workflow: SetupWorkflow
     @ObservedObject var activeAgentSettings: ActiveAgentSettings
+    @ObservedObject var notificationPreferences: NotificationPreferences
     @State private var pendingRemovalAgent: AgentKind?
     @State private var isConfirmingTokenRotation = false
 
@@ -351,6 +352,21 @@ struct AgentPulseSettingsView: View {
             Text("Agent Pulse uses a separate sender for each integration so notification banners keep the correct icon. Each sender may show one macOS permission prompt when you run its test.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    "Play notification sounds",
+                    isOn: Binding(
+                        get: { notificationPreferences.playsSounds },
+                        set: { runtime.setNotificationSoundsEnabled($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                Text("Uses the default system sound. macOS notification and Focus settings still apply.")
+                    .agentPulseFont(size: 11)
+                    .foregroundStyle(.secondary)
+            }
 
             notificationStatusRow(
                 title: "Agent Pulse",

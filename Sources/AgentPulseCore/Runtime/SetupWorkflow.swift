@@ -250,7 +250,9 @@ final class SetupWorkflow: ObservableObject {
         }
 
         let launchAtLogin = LaunchAtLoginService.live()
-        let notificationPermissions = NotificationPermissionService.live()
+        let notificationPermissions = NotificationPermissionService.live(
+            notificationPreferences: runtime.notificationPreferences
+        )
         let inspector = SetupHealthInspector.live(
             endpoint: endpoint,
             notificationPermissionService: notificationPermissions,

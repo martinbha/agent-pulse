@@ -6,11 +6,14 @@ import UserNotifications
 final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate {
     private let center: UNUserNotificationCenter
     private let verbProvider: WorkingVerbProvider
+    private let notificationPreferences: NotificationPreferences
 
     init(
+        notificationPreferences: NotificationPreferences,
         center: UNUserNotificationCenter = .current(),
         verbProvider: WorkingVerbProvider = WorkingVerbProvider()
     ) {
+        self.notificationPreferences = notificationPreferences
         self.center = center
         self.verbProvider = verbProvider
         super.init()
@@ -36,7 +39,7 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        NotifierPresentationPolicy.options(for: notification.request.content)
     }
 
     nonisolated func userNotificationCenter(
@@ -63,7 +66,8 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
                 .compactMap { $0 }
                 .filter { !$0.isEmpty }
                 .joined(separator: " · "),
-            hostBundleID: snapshot.hostBundleID
+            hostBundleID: snapshot.hostBundleID,
+            playsSound: notificationPreferences.playsSounds
         )
 
         if launchNotifierHelper(for: agent, command: command) {
@@ -71,6 +75,25 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
 
         postDirectly(command, agent: agent)
+    }
+
+    func requestSoundAuthorization() {
+        Task { [center] in
+            do {
+                _ = try await center.requestAuthorization(
+                    options: NotifierAuthorizationOptionsPolicy.options(playsSound: true)
+                )
+            } catch {
+                NSLog(
+                    "Agent Pulse could not request main notification sound permission: %@",
+                    error.localizedDescription
+                )
+            }
+        }
+
+        for agent in AgentKind.allCases {
+            requestHelperSoundAuthorization(for: agent)
+        }
     }
 
     /// Notifications go out through the agent's bundled helper app so the
@@ -114,6 +137,35 @@ final class AgentNotificationService: NSObject, UNUserNotificationCenterDelegate
             return nil
         }
         return url
+    }
+
+    private func requestHelperSoundAuthorization(for agent: AgentKind) {
+        guard let executableURL = Self.notifierExecutableURL(for: agent) else {
+            return
+        }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = [NotifierCommand.requestSoundAuthorizationArgument]
+        process.terminationHandler = { process in
+            if process.terminationStatus != 0 {
+                NSLog(
+                    "Agent Pulse notifier sound authorization for %@ exited with status %d",
+                    agent.rawValue,
+                    process.terminationStatus
+                )
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            NSLog(
+                "Agent Pulse could not request %@ notification sound permission: %@",
+                agent.rawValue,
+                error.localizedDescription
+            )
+        }
     }
 
     /// Direct posting from the main app remains as the fallback when the

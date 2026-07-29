@@ -28,6 +28,12 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
             return
         }
 
+        if arguments.contains(NotifierCommand.requestSoundAuthorizationArgument) {
+            requestSoundAuthorization()
+            scheduleExit(after: NotificationTiming.posterDeadline, status: 3)
+            return
+        }
+
         if let command {
             post(command)
             // Normal posting exits well before this; the deadline covers an
@@ -52,7 +58,7 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        NotifierPresentationPolicy.options(for: notification.request.content)
     }
 
     func userNotificationCenter(
@@ -86,7 +92,11 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
             case .post:
                 self.postAuthorized(command)
             case .request:
-                center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+                center.requestAuthorization(
+                    options: NotifierAuthorizationOptionsPolicy.options(
+                        playsSound: command.playsSound
+                    )
+                ) { granted, error in
                     if let error {
                         NSLog(
                             "Agent Pulse notifier authorization failed: %@",
@@ -104,6 +114,25 @@ final class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificatio
                 NSLog("Agent Pulse notifier notifications are not authorized")
                 exit(2)
             }
+        }
+    }
+
+    private func requestSoundAuthorization() {
+        center.requestAuthorization(
+            options: NotifierAuthorizationOptionsPolicy.options(playsSound: true)
+        ) { granted, error in
+            if let error {
+                NSLog(
+                    "Agent Pulse notifier sound authorization failed: %@",
+                    error.localizedDescription
+                )
+                exit(2)
+            }
+            guard granted else {
+                NSLog("Agent Pulse notifier sound authorization was not granted")
+                exit(2)
+            }
+            exit(0)
         }
     }
 

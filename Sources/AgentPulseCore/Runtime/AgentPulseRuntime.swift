@@ -9,6 +9,7 @@ final class AgentPulseRuntime: ObservableObject {
     let activeAgentSettings: ActiveAgentSettings
     let appearance: AppearanceSettings
     let hotkeySettings: HotkeySettings
+    let notificationPreferences: NotificationPreferences
     let appLauncher = AgentAppLauncher()
     lazy var setup = SetupWorkflow.live(runtime: self)
 
@@ -43,7 +44,8 @@ final class AgentPulseRuntime: ObservableObject {
             settings: AgentPulseSettings(),
             activeAgentSettings: activeAgentSettings,
             appearance: AppearanceSettings(),
-            hotkeySettings: HotkeySettings()
+            hotkeySettings: HotkeySettings(),
+            notificationPreferences: NotificationPreferences()
         )
     }
 
@@ -53,7 +55,8 @@ final class AgentPulseRuntime: ObservableObject {
         settings: AgentPulseSettings,
         activeAgentSettings: ActiveAgentSettings,
         appearance: AppearanceSettings,
-        hotkeySettings: HotkeySettings
+        hotkeySettings: HotkeySettings,
+        notificationPreferences: NotificationPreferences
     ) {
         self.store = store
         self.usageStore = usageStore
@@ -61,7 +64,10 @@ final class AgentPulseRuntime: ObservableObject {
         self.activeAgentSettings = activeAgentSettings
         self.appearance = appearance
         self.hotkeySettings = hotkeySettings
-        self.notificationService = AgentNotificationService()
+        self.notificationPreferences = notificationPreferences
+        self.notificationService = AgentNotificationService(
+            notificationPreferences: notificationPreferences
+        )
 
         startServer()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak store] _ in
@@ -73,6 +79,13 @@ final class AgentPulseRuntime: ObservableObject {
 
     func refreshUsage() {
         Task { await usageStore.refresh(trigger: .manual) }
+    }
+
+    func setNotificationSoundsEnabled(_ enabled: Bool) {
+        guard notificationPreferences.setPlaysSounds(enabled), enabled else {
+            return
+        }
+        notificationService.requestSoundAuthorization()
     }
 
     func setActiveAgentSelection(_ selection: ActiveAgentSelection) {
