@@ -105,9 +105,11 @@ import Testing
     @Test @MainActor func setupCompletionPresentationPersistsAfterFirstDisplay() async {
         let snapshot = await SetupWorkflowFixtures.completionPresentationState()
 
-        #expect(!snapshot.completeBeforeRefresh)
-        #expect(snapshot.completeAfterRefresh)
-        #expect(snapshot.incompleteSetupIsRequired)
+        #expect(snapshot.statusBeforeRefresh == .checking)
+        #expect(snapshot.statusAfterRefresh == .complete)
+        #expect(snapshot.incompleteStatus == .required)
+        #expect(snapshot.visibleSummary == .completion)
+        #expect(snapshot.consumedSummary == .hidden)
         #expect(!snapshot.initiallyPresented)
         #expect(snapshot.presentedAfterMarking)
         #expect(snapshot.presentedAfterReload)

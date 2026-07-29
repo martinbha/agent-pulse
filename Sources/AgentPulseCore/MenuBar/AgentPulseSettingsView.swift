@@ -129,14 +129,27 @@ struct AgentPulseSettingsView: View {
     }
 
     private var setupStatusPill: some View {
-        let isComplete = workflow.isSetupComplete
-        return Text(isComplete ? "Setup Complete" : "Setup Required")
+        let label: String
+        let tint: Color
+        switch workflow.completionStatus {
+        case .checking:
+            label = "Checking Setup"
+            tint = .gray
+        case .required:
+            label = "Setup Required"
+            tint = .orange
+        case .complete:
+            label = "Setup Complete"
+            tint = .green
+        }
+
+        return Text(label)
             .agentPulseFont(size: 11)
-            .foregroundStyle(isComplete ? Color.green : Color.orange)
+            .foregroundStyle(tint)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
-                (isComplete ? Color.green : Color.orange).opacity(0.12),
+                tint.opacity(0.12),
                 in: Capsule()
             )
     }
@@ -258,7 +271,11 @@ struct AgentPulseSettingsView: View {
 
     @ViewBuilder
     private func setupSummary(_ snapshot: SetupHealthSnapshot) -> some View {
-        if let issue = snapshot.blockingIssue {
+        switch SetupSummaryPresentationPolicy.presentation(
+            for: snapshot,
+            showsCompletionNotice: showsCompletionNotice
+        ) {
+        case .actionRequired(let issue):
             messageCard(
                 title: "Action required",
                 message: issue.message,
@@ -267,7 +284,7 @@ struct AgentPulseSettingsView: View {
             ) {
                 recommendedAction(for: snapshot)
             }
-        } else if snapshot.recommendedAction == .none && showsCompletionNotice {
+        case .completion:
             messageCard(
                 title: "Setup is complete",
                 message: "The local bridge and configured integrations are healthy.",
@@ -276,15 +293,17 @@ struct AgentPulseSettingsView: View {
             ) {
                 EmptyView()
             }
-        } else {
+        case .partial(let action):
             messageCard(
                 title: "Setup is partially complete",
-                message: recommendedMessage(snapshot.recommendedAction),
+                message: recommendedMessage(action),
                 systemImage: "info.circle.fill",
                 tint: .blue
             ) {
                 recommendedAction(for: snapshot)
             }
+        case .hidden:
+            EmptyView()
         }
     }
 

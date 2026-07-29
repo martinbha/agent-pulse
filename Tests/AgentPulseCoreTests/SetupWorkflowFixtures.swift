@@ -73,9 +73,11 @@ struct SetupConcurrentRefreshSnapshot {
 }
 
 struct SetupCompletionPresentationSnapshot {
-    var completeBeforeRefresh: Bool
-    var completeAfterRefresh: Bool
-    var incompleteSetupIsRequired: Bool
+    var statusBeforeRefresh: SetupCompletionStatus
+    var statusAfterRefresh: SetupCompletionStatus
+    var incompleteStatus: SetupCompletionStatus
+    var visibleSummary: SetupSummaryPresentation
+    var consumedSummary: SetupSummaryPresentation
     var initiallyPresented: Bool
     var presentedAfterMarking: Bool
     var presentedAfterReload: Bool
@@ -421,10 +423,18 @@ enum SetupWorkflowFixtures {
             }
         )
 
-        let completeBeforeRefresh = workflow.isSetupComplete
+        let statusBeforeRefresh = workflow.completionStatus
         let initiallyPresented = workflow.hasPresentedCompletionNotice
         await workflow.refresh()
-        let completeAfterRefresh = workflow.isSetupComplete
+        let statusAfterRefresh = workflow.completionStatus
+        let visibleSummary = SetupSummaryPresentationPolicy.presentation(
+            for: workflow.snapshot!,
+            showsCompletionNotice: true
+        )
+        let consumedSummary = SetupSummaryPresentationPolicy.presentation(
+            for: workflow.snapshot!,
+            showsCompletionNotice: false
+        )
         workflow.markCompletionNoticePresented()
 
         let incompleteWorkflow = SetupWorkflow(
@@ -449,9 +459,11 @@ enum SetupWorkflowFixtures {
         )
 
         return SetupCompletionPresentationSnapshot(
-            completeBeforeRefresh: completeBeforeRefresh,
-            completeAfterRefresh: completeAfterRefresh,
-            incompleteSetupIsRequired: !incompleteWorkflow.isSetupComplete,
+            statusBeforeRefresh: statusBeforeRefresh,
+            statusAfterRefresh: statusAfterRefresh,
+            incompleteStatus: incompleteWorkflow.completionStatus,
+            visibleSummary: visibleSummary,
+            consumedSummary: consumedSummary,
             initiallyPresented: initiallyPresented,
             presentedAfterMarking: workflow.hasPresentedCompletionNotice,
             presentedAfterReload: reloaded.hasPresentedCompletionNotice

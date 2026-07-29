@@ -111,6 +111,34 @@ enum SetupPresentationPolicy {
     }
 }
 
+enum SetupCompletionStatus: Equatable {
+    case checking
+    case required
+    case complete
+}
+
+enum SetupSummaryPresentation: Equatable {
+    case actionRequired(SetupBlockingIssue)
+    case partial(SetupRecommendedAction)
+    case completion
+    case hidden
+}
+
+enum SetupSummaryPresentationPolicy {
+    static func presentation(
+        for snapshot: SetupHealthSnapshot,
+        showsCompletionNotice: Bool
+    ) -> SetupSummaryPresentation {
+        if let issue = snapshot.blockingIssue {
+            return .actionRequired(issue)
+        }
+        if snapshot.recommendedAction == .none {
+            return showsCompletionNotice ? .completion : .hidden
+        }
+        return .partial(snapshot.recommendedAction)
+    }
+}
+
 enum SetupIntegrationOperations {
     static func canTest(_ integration: IntegrationHealthSnapshot) -> Bool {
         if case .current = integration.hooks {
@@ -257,11 +285,17 @@ final class SetupWorkflow: ObservableObject {
         defaults.bool(forKey: Self.completionNoticePresentedKey)
     }
 
-    var isSetupComplete: Bool {
+    var completionStatus: SetupCompletionStatus {
         guard let snapshot else {
-            return false
+            return .checking
         }
         return snapshot.blockingIssue == nil && snapshot.recommendedAction == .none
+            ? .complete
+            : .required
+    }
+
+    var isSetupComplete: Bool {
+        completionStatus == .complete
     }
 
     func prepareForLaunch() async -> Bool {
